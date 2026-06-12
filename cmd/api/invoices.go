@@ -75,19 +75,18 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// 🚀 Call the Insert() method on our Invoices model, passing in the validated pointer.
+	//  Call the Insert() method on our Invoices model, passing in the validated pointer.
 	// This will write the data to your PostgreSQL instance and return an updated object.
-	err = app.models.Invoices.Insert(invoice)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
 
-	// 🚀 Set the Location header to inform Next.js where the new resource can be found.
+	// err = app.models.Invoices.Insert(invoice)
+	// if err != nil {
+	// 	app.serverErrorResponse(w, r, err)
+	// 	return
+	// }
+
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/invoices/%d", invoice.ID))
 
-	// 🚀 Write a 201 Created JSON response with the envelope, matching Alex Edwards style.
 	err = app.writeJSON(w, http.StatusCreated, envelope{"invoice": invoice}, headers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
