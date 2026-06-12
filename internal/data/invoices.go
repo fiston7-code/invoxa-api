@@ -1,7 +1,11 @@
 package data
 
 import (
+	"fmt"
+	"strings"
 	"time"
+
+	"github.com/fiston7-code/invoxa-api/internal/validator"
 )
 
 type Invoice struct {
@@ -18,7 +22,7 @@ type Invoice struct {
 	ClientEmail   string `json:"client_email,omitempty"`
 	ClientAddress string `json:"client_address,omitempty"`
 
-	// 📦 CONTENU ET TOTAL (Relation One-to-Many)
+	//  CONTENU ET TOTAL (Relation One-to-Many)
 	Items       []*InvoiceItem `json:"items"`
 	TotalAmount float64        `json:"total_amount"`
 	Currency    string         `json:"currency"`
@@ -41,4 +45,37 @@ type InvoiceItem struct {
 	Quantity    int       `json:"quantity"`
 	UnitPrice   float64   `json:"unit_price"`
 	CreatedAt   time.Time `json:"-"`
+}
+
+// ValidateInvoice checks all business rules for an invoice and its nested line items.
+func ValidateInvoice(v *validator.Validator, invoice *Invoice) {
+	v.Check(strings.TrimSpace(invoice.InvoiceNumber) != "", "invoice_number", "must be provided")
+	v.Check(strings.TrimSpace(invoice.ClientName) != "", "client_name", "must be provided")
+
+	if invoice.ClientEmail != "" {
+		v.Check(validator.Matches(invoice.ClientEmail, validator.EmailRX), "client_email", "must be a valid email address")
+	}
+
+	v.Check(invoice.TotalAmount > 0, "total_amount", "must be greater than zero")
+	v.Check(validator.PermittedValue(invoice.Currency, "USD", "CDF"), "currency", "must be either USD or CDF")
+
+	v.Check(invoice.Items != nil, "items", "must be provided")
+	v.Check(len(invoice.Items) >= 1, "items", "must contain at least 1 item line")
+
+	// 🚀 The loop runs safely inside the data layer now!
+	for i, item := range invoice.Items {
+		ValidateInvoiceItem(v, i, item)
+	}
+}
+
+// ValidateInvoiceItem checks rules for an individual line item.
+func ValidateInvoiceItem(v *validator.Validator, index int, description string, unitPrice float64, quantity int) {
+	fieldKey := fmt.Sprintf("items[%d].description", index)
+	v.Check(strings.TrimSpace(description) != "", fieldKey, "must be provided")
+
+	priceKey := fmt.Sprintf("items[%d].unit_price", index)
+	v.Check(unitPrice > 0, priceKey, "must be a positive amount")
+
+	qtyKey := fmt.Sprintf("items[%d].quantity", index)
+	v.Check(quantity >= 1, qtyKey, "must be at least 1")
 }

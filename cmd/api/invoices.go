@@ -6,22 +6,18 @@ import (
 	"time"
 
 	"github.com/fiston7-code/invoxa-api/internal/data"
+	"github.com/fiston7-code/invoxa-api/internal/validator"
 )
 
-// Add a createMovieHandler for the "POST /v1/movies" endpoint. For now we simply
-// return a plain-text placeholder response.
 func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. On crée le struct anonyme complet pour tout capturer en toute sécurité
+	// Declare an anonymous struct to hold the expected input data from the client.
 	var input struct {
 		InvoiceNumber string `json:"invoice_number"`
-
-		// Infos Client
 		ClientName    string `json:"client_name"`
 		ClientPhone   string `json:"client_phone"`
 		ClientEmail   string `json:"client_email"`
 		ClientAddress string `json:"client_address"`
 
-		// 📦 Le tableau de lignes (on utilise un struct anonyme imbriqué)
 		Items []struct {
 			Description string  `json:"description"`
 			Quantity    int     `json:"quantity"`
@@ -31,7 +27,6 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		TotalAmount float64 `json:"total_amount"`
 		Currency    string  `json:"currency"`
 
-		// Notes et Pied de page
 		NoteTitle     string `json:"note_title"`
 		NoteText      string `json:"note_text"`
 		FooterAddress string `json:"footer_address"`
@@ -39,16 +34,64 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		FooterEmail   string `json:"footer_email"`
 	}
 
-	// Use the new readJSON() helper to decode the request body into the input struct.
-	// If this returns an error we send the client the error message along with a 400
-	// Bad Request status code, just like before.
+	// Decode the request body into the input struct.
 	err := app.readJSON(w, r, &input)
 	if err != nil {
-		// Use the new badRequestResponse() helper.
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	fmt.Fprintf(w, "%+v\n", input)
+
+	// Copy the values from the input struct to a new domain data.Invoice struct.
+	invoice := &data.Invoice{
+		InvoiceNumber: input.InvoiceNumber,
+		ClientName:    input.ClientName,
+		ClientPhone:   input.ClientPhone,
+		ClientEmail:   input.ClientEmail,
+		ClientAddress: input.ClientAddress,
+		TotalAmount:   input.TotalAmount,
+		Currency:      input.Currency,
+		NoteTitle:     input.NoteTitle,
+		NoteText:      input.NoteText,
+		FooterAddress: input.FooterAddress,
+		FooterPhone:   input.FooterPhone,
+		FooterEmail:   input.FooterEmail,
+	}
+
+	// Copy the nested input items into the domain model slice.
+	for _, item := range input.Items {
+		invoice.Items = append(invoice.Items, &data.InvoiceItem{
+			Description: item.Description,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.UnitPrice,
+		})
+	}
+
+	// Initialize a new Validator instance.
+	v := validator.New()
+
+	// Call the updated ValidateInvoice() which automatically handles sub-items loop.
+	if data.ValidateInvoice(v, invoice); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// 🚀 Call the Insert() method on our Invoices model, passing in the validated pointer.
+	// This will write the data to your PostgreSQL instance and return an updated object.
+	err = app.models.Invoices.Insert(invoice)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// 🚀 Set the Location header to inform Next.js where the new resource can be found.
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/invoices/%d", invoice.ID))
+
+	// 🚀 Write a 201 Created JSON response with the envelope, matching Alex Edwards style.
+	err = app.writeJSON(w, http.StatusCreated, envelope{"invoice": invoice}, headers)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func (app *application) showInvoiceHandler(w http.ResponseWriter, r *http.Request) {
