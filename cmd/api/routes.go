@@ -18,5 +18,7 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/invoices", app.createInvoiceHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id", app.showInvoiceHandler)
-	return router
+
+	// Wrap the router with the panic recovery middleware.
+	return app.recoverPanic(router)
 }
