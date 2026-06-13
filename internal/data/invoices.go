@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -224,10 +225,69 @@ func (m InvoiceModel) Get(id int) (*Invoice, error) {
 	return &invoice, nil
 }
 
-// Update met à jour les informations d'une facture et gère le verrouillage optimiste.
-func (i InvoiceModel) Update(invoice *Invoice) error {
-	// TODO: Implémenter la mise à jour SQL avec vérification de version
-	return nil
+func (m InvoiceModel) Update(invoice *Invoice) error {
+	// 1. Création d'un contexte avec timeout pour sécuriser l'opération
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// 2. Démarrage de la transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// Rollback automatique si une étape échoue avant le Commit
+	defer tx.Rollback()
+
+	// 3. Mise à jour de la table invoices avec contrôle de version
+	query := `
+        UPDATE invoices 
+        SET invoice_number = $1, invoice_date = $2, client_name = $3, client_phone = $4, 
+            client_email = $5, client_address = $6, total_amount = $7, currency = $8, 
+            status = $9, note_title = $10, note_text = $11, footer_address = $12, 
+            footer_phone = $13, footer_email = $14, version = version + 1
+        WHERE id = $15 AND version = $16
+        RETURNING version`
+
+	args := []any{
+		invoice.InvoiceNumber, invoice.InvoiceDate, invoice.ClientName, invoice.ClientPhone,
+		invoice.ClientEmail, invoice.ClientAddress, invoice.TotalAmount, invoice.Currency,
+		invoice.Status, invoice.NoteTitle, invoice.NoteText, invoice.FooterAddress,
+		invoice.FooterPhone, invoice.FooterEmail, invoice.ID, invoice.Version,
+	}
+
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&invoice.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict // Conflit de version détecté
+		default:
+			return err
+		}
+	}
+
+	// 4. Mise à jour atomique des items (si fournis)
+	if invoice.Items != nil {
+		// Suppression des anciens items
+		_, err = tx.ExecContext(ctx, "DELETE FROM invoice_items WHERE invoice_id = $1", invoice.ID)
+		if err != nil {
+			return err
+		}
+
+		// Insertion des nouveaux items
+		insertQuery := `
+            INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) 
+            VALUES ($1, $2, $3, $4)`
+
+		for _, item := range invoice.Items {
+			_, err = tx.ExecContext(ctx, insertQuery, invoice.ID, item.Description, item.Quantity, item.UnitPrice)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// 5. Validation de toute la transaction
+	return tx.Commit()
 }
 
 func (i InvoiceModel) Delete(id int) error {
