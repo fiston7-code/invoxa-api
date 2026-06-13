@@ -154,10 +154,74 @@ func (m InvoiceModel) Insert(invoice *Invoice) error {
 	return tx.Commit()
 }
 
-// Get récupère une facture spécifique et toutes ses lignes d'articles via son ID.
-func (i InvoiceModel) Get(id int) (*Invoice, error) {
-	// TODO: Implémenter la lecture SQL avec jointure ou double requête
-	return nil, nil
+func (m InvoiceModel) Get(id int) (*Invoice, error) {
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	// Requête SQL avec une jointure pour ramener la facture ET ses articles d'un coup
+	query := `
+        SELECT 
+            i.id, i.invoice_number, i.invoice_date, 
+            i.business_name, i.business_logo_url, i.business_rccm,
+            i.client_name, i.client_phone, i.client_email, i.client_address,
+            i.total_amount, i.currency, i.status, i.created_at, i.version,
+            it.id, it.description, it.quantity, it.unit_price
+        FROM invoices i
+        LEFT JOIN invoice_items it ON i.id = it.invoice_id
+        WHERE i.id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Contrairement à QueryRow, on utilise Query ici car la jointure va retourner
+	// autant de lignes qu'il y a d'articles dans la facture.
+	rows, err := m.DB.QueryContext(ctx, query, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var invoice Invoice
+	// Slice temporaire pour accumuler les articles
+	items := []*InvoiceItem{}
+
+	isFirstRow := true
+
+	for rows.Next() {
+		var item InvoiceItem
+		// On scanne à la fois les champs de la facture et ceux de l'article courant
+		err := rows.Scan(
+			&invoice.ID, &invoice.InvoiceNumber, &invoice.InvoiceDate,
+			&invoice.BusinessName, &invoice.BusinessLogoURL, &invoice.BusinessRCCM,
+			&invoice.ClientName, &invoice.ClientPhone, &invoice.ClientEmail, &invoice.ClientAddress,
+			&invoice.TotalAmount, &invoice.Currency, &invoice.Status, &invoice.CreatedAt, &invoice.Version,
+			&item.ID, &item.Description, &item.Quantity, &item.UnitPrice,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// On lie l'article à la facture
+		item.InvoiceID = invoice.ID
+		items = append(items, &item)
+
+		isFirstRow = false
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Si la boucle n'a jamais tourné, c'est que la facture n'existe pas
+	if isFirstRow {
+		return nil, ErrRecordNotFound
+	}
+
+	// On injecte la slice d'articles dans notre structure Invoice
+	invoice.Items = items
+
+	return &invoice, nil
 }
 
 // Update met à jour les informations d'une facture et gère le verrouillage optimiste.

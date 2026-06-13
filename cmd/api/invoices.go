@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -116,29 +117,15 @@ func (app *application) showInvoiceHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 2. On simule (Mock) une facture basée sur ton premier modèle visuel
-	invoice := data.Invoice{
-		ID:              id,
-		InvoiceNumber:   "009/26",
-		InvoiceDate:     time.Now(),
-		BusinessName:    "JA Agence de Placement",
-		BusinessLogoURL: "https://invoxa.storage/logos/ja-agency.png",
-		BusinessRCCM:    "CD/KNG/RCCM/22-A-03015 du 04/07/2022",
-		ClientName:      "OLYMPIC HOSPITAL",
-		ClientPhone:     "+243 000 000 000",
-		TotalAmount:     288.00,
-		Currency:        "USD",
-		Status:          "pending", // ◄ En changeant ça en "paid", ton front affichera le Reçu !
-		CreatedAt:       time.Now(),
-		Version:         1,
-		Items: []*data.InvoiceItem{
-			{
-				ID:          1,
-				Description: "Salaire agent placé – Mars 2026",
-				Quantity:    1,
-				UnitPrice:   288.00,
-			},
-		},
+	invoice, err := app.models.Invoices.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"invoice": invoice}, nil)
