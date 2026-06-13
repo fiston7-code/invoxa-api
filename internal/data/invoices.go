@@ -1,12 +1,19 @@
 package data
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/fiston7-code/invoxa-api/internal/validator"
 )
+
+// InvoiceModel encapsule le pool de connexions à PostgreSQL.
+type InvoiceModel struct {
+	DB *sql.DB
+}
 
 type Invoice struct {
 	ID            int       `json:"id"`
@@ -22,9 +29,8 @@ type Invoice struct {
 	ClientEmail   string `json:"client_email,omitempty"`
 	ClientAddress string `json:"client_address,omitempty"`
 
-	//  CONTENU ET TOTAL (Relation One-to-Many)
 	Items       []*InvoiceItem `json:"items"`
-	TotalAmount float64        `json:"total_amount"`
+	TotalAmount int            `json:"total_amount"` // Changé en int (centimes)
 	Currency    string         `json:"currency"`
 
 	NoteTitle     string `json:"note_title,omitempty"`
@@ -43,7 +49,7 @@ type InvoiceItem struct {
 	InvoiceID   int       `json:"invoice_id,omitempty"`
 	Description string    `json:"description"`
 	Quantity    int       `json:"quantity"`
-	UnitPrice   float64   `json:"unit_price"`
+	UnitPrice   int       `json:"unit_price"` // Changé en int (centimes)
 	CreatedAt   time.Time `json:"-"`
 }
 
@@ -82,4 +88,86 @@ func ValidateInvoiceItem(v *validator.Validator, index int, item *InvoiceItem) {
 
 	qtyKey := fmt.Sprintf("items[%d].quantity", index)
 	v.Check(item.Quantity >= 1, qtyKey, "must be at least 1")
+}
+
+// Insert écrit une nouvelle facture et ses articles associés dans PostgreSQL.
+func (m InvoiceModel) Insert(invoice *Invoice) error {
+	// 1. Définir la requête SQL pour l'en-tête de la facture
+	queryInvoice := `
+		INSERT INTO invoices (
+			invoice_number, invoice_date, business_name, business_logo_url, business_rccm,
+			client_name, client_phone, client_email, client_address,
+			total_amount, currency, note_title, note_text, 
+			footer_address, footer_phone, footer_email, status
+		) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		RETURNING id, created_at, version`
+
+	// 2. Définir la requête SQL pour les articles de la facture
+	queryItem := `
+		INSERT INTO invoice_items (invoice_id, description, quantity, unit_price)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id`
+
+	// 3. Créer un contexte avec un timeout de 3 secondes
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// 4. Démarrer la transaction SQL
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Au cas où le code panique ou s'arrête brutalement, on s'assure d'annuler les modifs
+	defer tx.Rollback()
+
+	// 5. Étape A : Insérer l'en-tête de la facture
+	argsInvoice := []any{
+		invoice.InvoiceNumber, invoice.InvoiceDate, invoice.BusinessName, invoice.BusinessLogoURL, invoice.BusinessRCCM,
+		invoice.ClientName, invoice.ClientPhone, invoice.ClientEmail, invoice.ClientAddress,
+		invoice.TotalAmount, invoice.Currency, invoice.NoteTitle, invoice.NoteText,
+		invoice.FooterAddress, invoice.FooterPhone, invoice.FooterEmail, invoice.Status,
+	}
+
+	// On exécute et on récupère directement les valeurs générées par Postgres (ID, CreatedAt, Version)
+	err = tx.QueryRowContext(ctx, queryInvoice, argsInvoice...).Scan(&invoice.ID, &invoice.CreatedAt, &invoice.Version)
+	if err != nil {
+		return err
+	}
+
+	// 6. Étape B : Insérer chaque article lié à cette facture
+	for _, item := range invoice.Items {
+		// On injecte l'ID de la facture tout juste créée dans la clé étrangère de l'article
+		item.InvoiceID = invoice.ID
+
+		argsItem := []any{item.InvoiceID, item.Description, item.Quantity, item.UnitPrice}
+
+		// On exécute l'insertion de la ligne et on récupère son ID généré
+		err = tx.QueryRowContext(ctx, queryItem, argsItem...).Scan(&item.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 7. Étape C : Si tout s'est bien passé, on valide définitivement la transaction
+	return tx.Commit()
+}
+
+// Get récupère une facture spécifique et toutes ses lignes d'articles via son ID.
+func (i InvoiceModel) Get(id int) (*Invoice, error) {
+	// TODO: Implémenter la lecture SQL avec jointure ou double requête
+	return nil, nil
+}
+
+// Update met à jour les informations d'une facture et gère le verrouillage optimiste.
+func (i InvoiceModel) Update(invoice *Invoice) error {
+	// TODO: Implémenter la mise à jour SQL avec vérification de version
+	return nil
+}
+
+// Delete supprime une facture de la base de données (les articles suivront en cascade).
+func (i InvoiceModel) Delete(id int) error {
+	// TODO: Implémenter la suppression SQL
+	return nil
 }
