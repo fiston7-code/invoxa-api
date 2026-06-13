@@ -19,6 +19,11 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/invoices", app.createInvoiceHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id", app.showInvoiceHandler)
 
+	router.HandlerFunc(http.MethodPatch, "/v1/invoices/:id", app.updateInvoiceHandler)
+
+	// Add the route for the DELETE /v1/invoices/:id endpoint.
+	router.HandlerFunc(http.MethodDelete, "/v1/invoices/:id", app.deleteInvoiceHandler)
+
 	// Wrap the router with the panic recovery middleware.
 	return app.recoverPanic(router)
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/fiston7-code/invoxa-api/internal/data"
@@ -113,7 +114,7 @@ func (app *application) showInvoiceHandler(w http.ResponseWriter, r *http.Reques
 	// 1. On récupère l'ID depuis l'URL grâce à ton helper
 	id, err := app.readIDParam(r)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFoundResponse(w, r)
 		return
 	}
 
@@ -131,6 +132,151 @@ func (app *application) showInvoiceHandler(w http.ResponseWriter, r *http.Reques
 	err = app.writeJSON(w, http.StatusOK, envelope{"invoice": invoice}, nil)
 	if err != nil {
 		// Use the new serverErrorResponse() helper.
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) updateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Extraire l'ID de la facture depuis l'URL
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	// 2. Récupérer la facture existante en BDD
+	invoice, err := app.models.Invoices.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// 3. Vérification du Header de version (Optimistic Concurrency Control préventif)
+	if r.Header.Get("X-Expected-Version") != "" {
+		if strconv.Itoa(int(invoice.Version)) != r.Header.Get("X-Expected-Version") {
+			app.editConflictResponse(w, r)
+			return
+		}
+	}
+
+	// 4. Déclarer la structure d'input avec des POINTEURS pour le mode PATCH
+	// 4. Structure INPUT avec TOUS les champs modifiables d'une facture
+	var input struct {
+		InvoiceNumber *string    `json:"invoice_number"`
+		InvoiceDate   *time.Time `json:"invoice_date"`
+		ClientName    *string    `json:"client_name"`
+		ClientPhone   *string    `json:"client_phone"`
+		ClientEmail   *string    `json:"client_email"`
+		ClientAddress *string    `json:"client_address"`
+		TotalAmount   *int       `json:"total_amount"`
+		Currency      *string    `json:"currency"`
+		Status        *string    `json:"status"`
+
+		// Ajout des notes et footers manquants
+		NoteTitle     *string `json:"note_title"`
+		NoteText      *string `json:"note_text"`
+		FooterAddress *string `json:"footer_address"`
+		FooterPhone   *string `json:"footer_phone"`
+		FooterEmail   *string `json:"footer_email"`
+
+		// Ajout du pointeur vers la slice d'items pour le PATCH
+		Items *[]struct {
+			Description string `json:"description"`
+			Quantity    int    `json:"quantity"`
+			UnitPrice   int    `json:"unit_price"`
+		} `json:"items"`
+	}
+
+	// 5. Décoder le JSON de la requête
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// 6. Application conditionnelle des modifications (Déréférencement des pointeurs)
+	if input.InvoiceNumber != nil {
+		invoice.InvoiceNumber = *input.InvoiceNumber
+	}
+	if input.InvoiceDate != nil {
+		invoice.InvoiceDate = *input.InvoiceDate
+	}
+	if input.ClientName != nil {
+		invoice.ClientName = *input.ClientName
+	}
+	if input.ClientPhone != nil {
+		invoice.ClientPhone = *input.ClientPhone
+	}
+	if input.ClientEmail != nil {
+		invoice.ClientEmail = *input.ClientEmail
+	}
+	if input.ClientAddress != nil {
+		invoice.ClientAddress = *input.ClientAddress
+	}
+	if input.TotalAmount != nil {
+		invoice.TotalAmount = *input.TotalAmount
+	}
+	if input.Currency != nil {
+		invoice.Currency = *input.Currency
+	}
+	if input.Status != nil {
+		invoice.Status = *input.Status
+	}
+
+	// 7. Validation des données de la facture mise à jour
+	v := validator.New()
+	if data.ValidateInvoice(v, invoice); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// 8. Exécuter la mise à jour en base de données
+	err = app.models.Invoices.Update(invoice)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// 9. Renvoyer la facture modifiée et sa nouvelle version
+	err = app.writeJSON(w, http.StatusOK, envelope{"invoice": invoice}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) deleteInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Extraire l'ID de la facture (en int64 grâce à ton helper)
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	// 2. Appeler la méthode Delete() de ton modèle
+	err = app.models.Invoices.Delete(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// 3. Renvoyer la confirmation de suppression en JSON
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "invoice and its items successfully deleted"}, nil)
+	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
 }

@@ -230,8 +230,36 @@ func (i InvoiceModel) Update(invoice *Invoice) error {
 	return nil
 }
 
-// Delete supprime une facture de la base de données (les articles suivront en cascade).
 func (i InvoiceModel) Delete(id int) error {
-	// TODO: Implémenter la suppression SQL
+	// Si l'ID n'est pas valide, on s'arrête tout de suite
+	if id < 1 {
+		return ErrRecordNotFound
+	}
+
+	// Requête SQL de suppression ciblée
+	query := `
+        DELETE FROM invoices
+        WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// On utilise ExecContext car on ne s'attend pas à recevoir des lignes de données en retour
+	result, err := i.DB.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	// On vérifie combien de lignes ont été affectées par la requête
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// Si aucune ligne n'a été modifiée, c'est que la facture n'existait pas en BDD
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
 	return nil
 }
