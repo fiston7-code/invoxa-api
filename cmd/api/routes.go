@@ -15,7 +15,9 @@ func (app *application) routes() http.Handler {
 	// Likewise, convert the methodNotAllowedResponse() helper to a http.Handler and set
 	// it as the custom error handler for 405 Method Not Allowed responses.
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
+
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/invoices", app.listInvoicesHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/invoices", app.createInvoiceHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id", app.showInvoiceHandler)
 

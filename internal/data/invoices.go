@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fiston7-code/invoxa-api/internal/validator"
+	"github.com/lib/pq"
 )
 
 // InvoiceModel encapsule le pool de connexions à PostgreSQL.
@@ -123,6 +124,13 @@ func (m InvoiceModel) Insert(invoice *Invoice) error {
 	// Au cas où le code panique ou s'arrête brutalement, on s'assure d'annuler les modifs
 	defer tx.Rollback()
 
+	// 1. Calculer le total à partir des items pour ignorer toute valeur envoyée par le client
+	calculatedTotal := int(0)
+	for _, item := range invoice.Items {
+		calculatedTotal += (item.Quantity * item.UnitPrice)
+	}
+	invoice.TotalAmount = calculatedTotal // On écrase la valeur client par notre calcul
+
 	// 5. Étape A : Insérer l'en-tête de la facture
 	argsInvoice := []any{
 		invoice.InvoiceNumber, invoice.InvoiceDate, invoice.BusinessName, invoice.BusinessLogoURL, invoice.BusinessRCCM,
@@ -134,6 +142,10 @@ func (m InvoiceModel) Insert(invoice *Invoice) error {
 	// On exécute et on récupère directement les valeurs générées par Postgres (ID, CreatedAt, Version)
 	err = tx.QueryRowContext(ctx, queryInvoice, argsInvoice...).Scan(&invoice.ID, &invoice.CreatedAt, &invoice.Version)
 	if err != nil {
+		// Vérification du code d'erreur 23505 (Unique Violation)
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+			return ErrDuplicateInvoiceNumber // Retourne une erreur métier claire
+		}
 		return err
 	}
 
@@ -322,4 +334,52 @@ func (i InvoiceModel) Delete(id int) error {
 	}
 
 	return nil
+}
+
+func (m InvoiceModel) GetAll(clientName string, status string, filters Filters) ([]*Invoice, Metadata, error) {
+	// 1. Requête SQL dynamique avec le window function count(*) OVER()
+	query := fmt.Sprintf(`
+SELECT count(*) OVER(), id, invoice_number, invoice_date, business_name, 
+               client_name, client_phone, client_email, client_address,
+               total_amount, currency, status, created_at, version
+        FROM invoices
+        WHERE (client_name ILIKE '%%' || $1 || '%%' OR $1 = '')
+        AND (status = UPPER($2) OR $2 = '')
+        ORDER BY %s %s, id ASC
+        LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	args := []any{clientName, status, filters.limit(), filters.offset()}
+
+	rows, err := m.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+	defer rows.Close()
+
+	totalRecords := 0
+	invoices := []*Invoice{}
+
+	for rows.Next() {
+		var i Invoice
+		err := rows.Scan(
+			&totalRecords,
+			&i.ID, &i.InvoiceNumber, &i.InvoiceDate, &i.BusinessName,
+			&i.ClientName, &i.ClientPhone, &i.ClientEmail, &i.ClientAddress,
+			&i.TotalAmount, &i.Currency, &i.Status, &i.CreatedAt, &i.Version,
+		)
+		if err != nil {
+			return nil, Metadata{}, err
+		}
+		invoices = append(invoices, &i)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, Metadata{}, err
+	}
+
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+	return invoices, metadata, nil
 }

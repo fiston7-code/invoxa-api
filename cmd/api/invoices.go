@@ -280,3 +280,48 @@ func (app *application) deleteInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) listInvoicesHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ClientName string // Plus utile que BusinessName
+		Status     string
+		data.Filters
+	}
+
+	v := validator.New()
+	qs := r.URL.Query()
+
+	// 1. On filtre sur ce qui change vraiment
+	input.ClientName = app.readString(qs, "client_name", "")
+	input.Status = app.readString(qs, "status", "")
+
+	// 2. Pagination et tri
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+	input.Filters.Sort = app.readString(qs, "sort", "-invoice_date") // Tri par défaut plus logique : le plus récent
+
+	// 3. Liste blanche adaptée
+	input.Filters.SortSafelist = []string{
+		"id", "invoice_number", "invoice_date", "total_amount", "client_name",
+		"-id", "-invoice_number", "-invoice_date", "-total_amount", "-client_name",
+	}
+
+	// 4. Validation
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// 5. Appel au modèle (à implémenter dans invoices.go)
+	invoices, metadata, err := app.models.Invoices.GetAll(input.ClientName, input.Status, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// 6. Réponse avec metadata
+	err = app.writeJSON(w, http.StatusOK, envelope{"invoices": invoices, "metadata": metadata}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}

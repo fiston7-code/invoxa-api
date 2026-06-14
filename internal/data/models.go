@@ -7,8 +7,9 @@ import (
 
 // Centralisation des erreurs globales du storage pour ton SaaS
 var (
-	ErrRecordNotFound = errors.New("record not found")
-	ErrEditConflict   = errors.New("edit conflict")
+	ErrRecordNotFound         = errors.New("record not found")
+	ErrEditConflict           = errors.New("edit conflict")
+	ErrDuplicateInvoiceNumber = errors.New("duplicate invoice number")
 )
 
 // Models regroupe tous les modèles de données du SaaS Invoxa.
