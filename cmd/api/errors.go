@@ -69,8 +69,3 @@ func (app *application) editConflictResponse(w http.ResponseWriter, r *http.Requ
 	message := "unable to update the record due to an edit conflict, please try again"
 	app.errorResponse(w, r, http.StatusConflict, message)
 }
-
-func (app *application) ErrDuplicateInvoiceNumber(w http.ResponseWriter, r *http.Request) {
-	message := "an invoice with this number already exists"
-	app.errorResponse(w, r, http.StatusConflict, message)
-}
