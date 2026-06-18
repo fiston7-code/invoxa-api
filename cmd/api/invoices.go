@@ -8,19 +8,15 @@ import (
 	"time"
 
 	"github.com/fiston7-code/invoxa-api/internal/data"
+	"github.com/fiston7-code/invoxa-api/internal/pdf"
 	"github.com/fiston7-code/invoxa-api/internal/validator"
 )
 
 func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Request) {
-	// Declare an anonymous struct to hold the expected input data from the client.
+	// Structure complète pour correspondre à ton JSON
 	var input struct {
 		InvoiceNumber string    `json:"invoice_number"`
 		InvoiceDate   time.Time `json:"invoice_date"`
-
-		// AJOUTE CES 3 CHAMPS BUSINESS ICI :
-		BusinessName    string `json:"business_name"`
-		BusinessLogoURL string `json:"business_logo_url"`
-		BusinessRCCM    string `json:"business_rccm"`
 
 		ClientName    string `json:"client_name"`
 		ClientPhone   string `json:"client_phone"`
@@ -30,36 +26,38 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		Items []struct {
 			Description string `json:"description"`
 			Quantity    int    `json:"quantity"`
-			UnitPrice   int    `json:"unit_price"` // Aligné en int (centimes) !
+			UnitPrice   int    `json:"unit_price"`
 		} `json:"items"`
 
-		TotalAmount int    `json:"total_amount"` // Aligné en int (centimes) !
+		TotalAmount int    `json:"total_amount"`
 		Currency    string `json:"currency"`
-
-		NoteTitle     string `json:"note_title"`
-		NoteText      string `json:"note_text"`
-		FooterAddress string `json:"footer_address"`
-		FooterPhone   string `json:"footer_phone"`
-		FooterEmail   string `json:"footer_email"`
-
-		// AJOUTE LE STATUS ICI :
-		Status string `json:"status"`
+		NoteTitle   string `json:"note_title"`
+		NoteText    string `json:"note_text"`
+		Status      string `json:"status"`
 	}
 
-	// Decode the request body into the input struct.
-	err := app.readJSON(w, r, &input)
-	if err != nil {
+	if err := app.readJSON(w, r, &input); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Copy the values from the input struct to a new domain data.Invoice struct.
+	// Récupération automatique du profil entreprise (le "cerveau" de l'injection)
+	profile, err := app.models.BusinessProfiles.Get(1)
+	if err != nil {
+		app.serverErrorResponse(w, r, errors.New("veuillez configurer votre profil entreprise d'abord"))
+		return
+	}
+
+	// Fusion des données : Input + Profile
 	invoice := &data.Invoice{
 		InvoiceNumber:   input.InvoiceNumber,
-		InvoiceDate:     input.InvoiceDate,     // AJOUTÉ
-		BusinessName:    input.BusinessName,    // AJOUTÉ
-		BusinessLogoURL: input.BusinessLogoURL, // AJOUTÉ
-		BusinessRCCM:    input.BusinessRCCM,    // AJOUTÉ
+		InvoiceDate:     input.InvoiceDate,
+		BusinessName:    profile.Name,
+		BusinessLogoURL: profile.LogoURL,
+		BusinessRCCM:    profile.RCCM,
+		FooterAddress:   profile.Address,
+		FooterPhone:     profile.Phone,
+		FooterEmail:     profile.Email,
 		ClientName:      input.ClientName,
 		ClientPhone:     input.ClientPhone,
 		ClientEmail:     input.ClientEmail,
@@ -68,10 +66,7 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		Currency:        input.Currency,
 		NoteTitle:       input.NoteTitle,
 		NoteText:        input.NoteText,
-		FooterAddress:   input.FooterAddress,
-		FooterPhone:     input.FooterPhone,
-		FooterEmail:     input.FooterEmail,
-		Status:          input.Status, // AJOUTÉ
+		Status:          input.Status,
 	}
 
 	// Copy the nested input items into the domain model slice.
@@ -321,6 +316,48 @@ func (app *application) listInvoicesHandler(w http.ResponseWriter, r *http.Reque
 
 	// 6. Réponse avec metadata
 	err = app.writeJSON(w, http.StatusOK, envelope{"invoices": invoices, "metadata": metadata}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) downloadInvoicePDFHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Extraction et validation de l'ID depuis l'URL
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	// 2. Récupération de la facture complète depuis PostgreSQL
+	invoice, err := app.models.Invoices.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// 3. Génération des octets binaires du PDF
+	pdfBuffer, err := pdf.GenerateInvoicePDF(invoice)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// 4. Configuration des en-têtes HTTP pour forcer l'affichage ou le téléchargement clean
+	filename := fmt.Sprintf("invoice-%s.pdf", invoice.InvoiceNumber)
+
+	w.Header().Set("Content-Type", "application/pdf")
+	// Use "inline" to open nicely in a browser tab, or "attachment" to force immediate download
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filename))
+	w.Header().Set("Content-Length", strconv.Itoa(pdfBuffer.Len()))
+
+	// 5. Envoi du flux binaire
+	_, err = w.Write(pdfBuffer.Bytes())
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

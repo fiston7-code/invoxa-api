@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	// Import the pq driver so that it can register itself with the database/sql
@@ -41,6 +41,11 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+
+	// Add a cors struct and trustedOrigins field with the type []string.
+	cors struct {
+		trustedOrigins []string
+	}
 }
 
 // Define an application struct to hold the dependencies for our HTTP handlers, helpers,
@@ -50,6 +55,7 @@ type application struct {
 	config config
 	logger *slog.Logger
 	models data.Models
+	wg     sync.WaitGroup
 }
 
 func main() {
@@ -69,6 +75,17 @@ func main() {
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
+
+	// Use the flag.Func() function to process the -cors-trusted-origins command line
+	// flag. In this we use the strings.Fields() function to split the flag value into a
+	// slice based on whitespace characters and assign it to our config struct.
+	// Importantly, if the -cors-trusted-origins flag is not present, contains the empty
+	// string, or contains only whitespace, then strings.Fields() will return an empty
+	// []string slice.
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
 
 	flag.Parse()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -93,21 +110,12 @@ func main() {
 		logger: logger,
 		models: data.NewModels(db),
 	}
-	// Use the httprouter instance returned by app.routes() as the server handler.
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
+
+	err = app.serve()
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
 	}
-	logger.Info("starting server", "addr", srv.Addr, "env", cfg.env)
-	// Because the err variable is now already declared in the code above, we need
-	// to use the = operator here, instead of the := operator.
-	err = srv.ListenAndServe()
-	logger.Error(err.Error())
-	os.Exit(1)
 }
 
 func openDB(cfg config) (*sql.DB, error) {

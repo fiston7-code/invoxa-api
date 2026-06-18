@@ -18,6 +18,7 @@ func (app *application) routes() http.Handler {
 
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/invoices", app.listInvoicesHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id/pdf", app.downloadInvoicePDFHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/invoices", app.createInvoiceHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id", app.showInvoiceHandler)
 
@@ -26,6 +27,10 @@ func (app *application) routes() http.Handler {
 	// Add the route for the DELETE /v1/invoices/:id endpoint.
 	router.HandlerFunc(http.MethodDelete, "/v1/invoices/:id", app.deleteInvoiceHandler)
 
-	// Wrap the router with the rateLimit() middleware.
-	return app.recoverPanic(app.rateLimit(router))
+	router.HandlerFunc(http.MethodGet, "/v1/business/:id", app.getBusinessProfileHandler)
+	router.HandlerFunc(http.MethodPost, "/v1/business", app.createBusinessProfileHandler)
+	router.HandlerFunc(http.MethodPatch, "/v1/business/:id", app.updateBusinessProfileHandler)
+
+	// Wrap the router with CORS, rateLimit, and recoverPanic middlewares.
+	return app.recoverPanic(app.rateLimit(app.enableCORS(router)))
 }
