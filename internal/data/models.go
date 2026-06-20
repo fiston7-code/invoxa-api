@@ -17,6 +17,7 @@ var (
 type Models struct {
 	Invoices         InvoiceModel
 	BusinessProfiles BusinessProfileModel
+	Users            UserModel
 }
 
 // NewModels initialise et renvoie une structure Models contenant notre pool SQL.
@@ -24,5 +25,6 @@ func NewModels(db *sql.DB) Models {
 	return Models{
 		Invoices:         InvoiceModel{DB: db},
 		BusinessProfiles: BusinessProfileModel{DB: db},
+		Users:            UserModel{DB: db},
 	}
 }

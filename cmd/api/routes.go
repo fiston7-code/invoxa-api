@@ -30,7 +30,9 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/business/:id", app.getBusinessProfileHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/business", app.createBusinessProfileHandler)
 	router.HandlerFunc(http.MethodPatch, "/v1/business/:id", app.updateBusinessProfileHandler)
-	router.HandlerFunc(http.MethodPost, "/v1/test-upload", app.testUploadHandler)
+	// router.HandlerFunc(http.MethodPost, "/v1/test-upload", app.testUploadHandler)
+
+	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
 
 	// Wrap the router with CORS, rateLimit, and recoverPanic middlewares.
 	return app.recoverPanic(app.rateLimit(app.enableCORS(router)))
