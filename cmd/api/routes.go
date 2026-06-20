@@ -33,6 +33,8 @@ func (app *application) routes() http.Handler {
 	// router.HandlerFunc(http.MethodPost, "/v1/test-upload", app.testUploadHandler)
 
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
+	// Add the route for the PUT /v1/users/activated endpoint.
+	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 
 	// Wrap the router with CORS, rateLimit, and recoverPanic middlewares.
 	return app.recoverPanic(app.rateLimit(app.enableCORS(router)))
