@@ -13,7 +13,9 @@ import (
 	// Import the pq driver so that it can register itself with the database/sql
 	// package. Note that we alias this import to the blank identifier, to stop the Go
 	// compiler complaining that the package isn't being used.
+	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/fiston7-code/invoxa-api/internal/data"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -52,13 +54,19 @@ type config struct {
 // and middleware. At the moment this only contains a copy of the config struct and a
 // logger, but it will grow to include a lot more as our build progresses.
 type application struct {
-	config config
-	logger *slog.Logger
-	models data.Models
-	wg     sync.WaitGroup
+	config     config
+	logger     *slog.Logger
+	models     data.Models
+	wg         sync.WaitGroup
+	cloudinary *cloudinary.Cloudinary
 }
 
 func main() {
+
+	// 2. Charger le fichier .env avant d'évaluer les variables d'environnement des flags
+	// On ignore l'erreur car en production sur DigitalOcean, les variables sont injectées directement.
+	_ = godotenv.Load()
+
 	var cfg config
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
@@ -105,10 +113,19 @@ func main() {
 	// established.
 	logger.Info("database connection pool established")
 
+	//Initialiser le client Cloudinary en appelant la fonction du fichier cloudinary.go
+	cldClient, err := initCloudinary()
+	if err != nil {
+		logger.Error("failed to initialize cloudinary", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("cloudinary client successfully initialized")
+
 	app := &application{
-		config: cfg,
-		logger: logger,
-		models: data.NewModels(db),
+		config:     cfg,
+		logger:     logger,
+		models:     data.NewModels(db),
+		cloudinary: cldClient,
 	}
 
 	err = app.serve()

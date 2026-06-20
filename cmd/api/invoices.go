@@ -15,8 +15,9 @@ import (
 func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	// Structure complète pour correspondre à ton JSON
 	var input struct {
-		InvoiceNumber string    `json:"invoice_number"`
-		InvoiceDate   time.Time `json:"invoice_date"`
+		BusinessProfileID int       `json:"business_profile_id"`
+		InvoiceNumber     string    `json:"invoice_number"`
+		InvoiceDate       time.Time `json:"invoice_date"`
 
 		ClientName    string `json:"client_name"`
 		ClientPhone   string `json:"client_phone"`
@@ -42,7 +43,7 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Récupération automatique du profil entreprise (le "cerveau" de l'injection)
-	profile, err := app.models.BusinessProfiles.Get(1)
+	profile, err := app.models.BusinessProfiles.Get(input.BusinessProfileID)
 	if err != nil {
 		app.serverErrorResponse(w, r, errors.New("veuillez configurer votre profil entreprise d'abord"))
 		return
@@ -50,6 +51,7 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 
 	// Fusion des données : Input + Profile
 	invoice := &data.Invoice{
+
 		InvoiceNumber:   input.InvoiceNumber,
 		InvoiceDate:     input.InvoiceDate,
 		BusinessName:    profile.Name,
@@ -342,7 +344,16 @@ func (app *application) downloadInvoicePDFHandler(w http.ResponseWriter, r *http
 	}
 
 	// 3. Génération des octets binaires du PDF
-	pdfBuffer, err := pdf.GenerateInvoicePDF(invoice)
+	profile := &data.BusinessProfile{
+		Name:    invoice.BusinessName,
+		LogoURL: invoice.BusinessLogoURL,
+		RCCM:    invoice.BusinessRCCM,
+		Address: invoice.FooterAddress,
+		Phone:   invoice.FooterPhone,
+		Email:   invoice.FooterEmail,
+	}
+
+	pdfBuffer, err := pdf.GenerateInvoicePDF(invoice, profile)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
