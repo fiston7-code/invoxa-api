@@ -1,0 +1,47 @@
+{{define "subject"}}Bienvenue sur Invoxa !{{end}}
+
+{{define "plainBody"}}
+Bonjour,
+
+Merci de vous être inscrit sur Invoxa. Nous sommes ravis de vous compter parmi nous !
+
+Pour rappel, votre numéro d'utilisateur est le {{.userID}}.
+
+Veuillez envoyer une requête PUT à l'endpoint /v1/users/activated avec le corps JSON suivant pour activer votre compte :
+
+{"token": "{{.activationToken}}"}
+
+Veuillez noter qu'il s'agit d'un jeton à usage unique et qu'il expirera dans 3 jours.
+
+Merci,
+L'équipe Invoxa
+{{end}}
+
+{{define "htmlBody"}}
+<!doctype html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+</head>
+<body style="font-family: sans-serif; color: #333333; background-color: #f6f9fc; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+        <h2 style="color: #1a365d; margin-top: 0;">Bienvenue sur Invoxa !</h2>
+        <p>Bonjour,</p>
+        <p>Merci de vous être inscrit sur <strong>Invoxa</strong>. Nous sommes ravis de vous compter parmi nous !</p>
+        <p>Pour rappel, votre numéro d'utilisateur est le <strong>{{.userID}}</strong>.</p>
+        
+        <p>Veuillez envoyer une requête <code>PUT</code> à l'endpoint <code>/v1/users/activated</code> avec le corps JSON suivant pour activer votre compte :</p>
+        
+        <div style="background-color: #edf2f7; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 14px; margin: 20px 0; overflow-x: auto;">
+            <code>{"token": "{{.activationToken}}"}</code>
+        </div>
+        
+        <p style="font-size: 14px; color: #4a5568;"><em>Note : Ce jeton est à usage unique et expirera dans 3 jours.</em></p>
+        <br />
+        <p style="margin-bottom: 0;">Merci,</p>
+        <p style="margin-top: 5px; font-weight: bold; color: #2b6cb0;">L'équipe Invoxa</p>
+    </div>
+</body>
+</html>
+{{end}}

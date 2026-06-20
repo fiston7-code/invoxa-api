@@ -173,3 +173,19 @@ func (app *application) readString(qs url.Values, key string, defaultValue strin
 	// Otherwise return the string.
 	return s
 }
+
+func (app *application) background(fn func()) {
+	// Use the Go() method to launch the background goroutine. The code inside
+	// this is exactly the same as in the previous chapter --- we're just now
+	// launching the goroutine using the WaitGroup's Go() method instead of the
+	// regular go() keyword.
+	app.wg.Go(func() {
+		defer func() {
+			pv := recover()
+			if pv != nil {
+				app.logger.Error(fmt.Sprintf("%v", pv))
+			}
+		}()
+		fn()
+	})
+}

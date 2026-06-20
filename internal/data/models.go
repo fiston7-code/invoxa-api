@@ -17,6 +17,7 @@ var (
 type Models struct {
 	Invoices         InvoiceModel
 	BusinessProfiles BusinessProfileModel
+	Tokens           TokenModel
 	Users            UserModel
 }
 
@@ -25,6 +26,7 @@ func NewModels(db *sql.DB) Models {
 	return Models{
 		Invoices:         InvoiceModel{DB: db},
 		BusinessProfiles: BusinessProfileModel{DB: db},
+		Tokens:           TokenModel{DB: db},
 		Users:            UserModel{DB: db},
 	}
 }
