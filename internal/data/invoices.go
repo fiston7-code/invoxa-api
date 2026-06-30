@@ -153,6 +153,7 @@ func (m InvoiceModel) Get(id int, businessID int) (*Invoice, error) {
 			i.id, i.invoice_number,  i.invoice_date, 
 			i.business_id, i.business_name, i.business_logo_url, i.business_rccm,
 			i.client_name, i.client_phone, i.client_email, i.client_address,
+			i.note_title, i.note_text,
 			i.total_amount, i.currency, i.status, i.created_at, i.version,
 			it.id, it.description, it.quantity, it.unit_price
 		FROM invoices i
@@ -178,6 +179,7 @@ func (m InvoiceModel) Get(id int, businessID int) (*Invoice, error) {
 			&invoice.ID, &invoice.InvoiceNumber, &invoice.InvoiceDate,
 			&invoice.BusinessID, &invoice.BusinessName, &invoice.BusinessLogoURL, &invoice.BusinessRCCM,
 			&invoice.ClientName, &invoice.ClientPhone, &invoice.ClientEmail, &invoice.ClientAddress,
+			&invoice.NoteTitle, &invoice.NoteText,
 			&invoice.TotalAmount, &invoice.Currency, &invoice.Status, &invoice.CreatedAt, &invoice.Version,
 			&item.ID, &item.Description, &item.Quantity, &item.UnitPrice,
 		)
