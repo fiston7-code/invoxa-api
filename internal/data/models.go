@@ -16,6 +16,7 @@ var (
 // C'est cette structure unique que l'on va injecter dans ton application globale.
 type Models struct {
 	Invoices         InvoiceModel
+	Permissions      PermissionModel
 	BusinessProfiles BusinessProfileModel
 	Tokens           TokenModel
 	Users            UserModel
@@ -25,6 +26,7 @@ type Models struct {
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Invoices:         InvoiceModel{DB: db},
+		Permissions:      PermissionModel{DB: db},
 		BusinessProfiles: BusinessProfileModel{DB: db},
 		Tokens:           TokenModel{DB: db},
 		Users:            UserModel{DB: db},

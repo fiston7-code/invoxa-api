@@ -1,12 +1,17 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
+	"github.com/fiston7-code/invoxa-api/internal/data"
+	"github.com/fiston7-code/invoxa-api/internal/validator"
 	"github.com/tomasen/realip" // New import
 )
 
@@ -117,6 +122,121 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 				}
 			}
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add the "Vary: Authorization" header to the response. This indicates to any
+		// caches that the response may vary based on the value of the Authorization
+		// header in the request.
+		w.Header().Add("Vary", "Authorization")
+		// Retrieve the value of the Authorization header from the request. This will
+		// return the empty string "" if there is no such header found.
+		authorizationHeader := r.Header.Get("Authorization")
+		// If there is no Authorization header found, call the next handler in the chain
+		// as normal and then return without executing any of the code below.
+		if authorizationHeader == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Otherwise, we expect the value of the Authorization header to be in the format
+		// "Bearer <token>". We try to split this into its constituent parts, and if the
+		// header isn't in the expected format we return a 401 Unauthorized response
+		// using the invalidAuthenticationTokenResponse() helper (which we will create
+		// in a moment).
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+		// Extract the actual authentication token from the header parts.
+		token := headerParts[1]
+		// Validate the token to make sure it is in a sensible format.
+		v := validator.New()
+		// If the token isn't valid, use the invalidAuthenticationTokenResponse()
+		// helper to send a response, rather than the failedValidationResponse() helper
+		// that we'd normally use.
+		if data.ValidateTokenPlaintext(v, token); !v.Valid() {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+		// Retrieve the details of the user associated with the authentication token,
+		// again calling the invalidAuthenticationTokenResponse() helper if no
+		// matching record was found. IMPORTANT: Notice that we are using
+		// ScopeAuthentication as the first parameter here.
+		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+		// At this point, we know that the current user has authenticated using
+		// a valid token, and we add their user information to the request context
+		// with the contextSetAuthenticatedUser() helper that we just made.
+		r = app.contextSetAuthenticatedUser(r, user)
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+	})
+}
+
+//lint:ignore U1000 middleware currently unused, but might be in the future
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Use the contextGetAuthenticatedUser() helper that we made earlier to retrieve
+		// the authenticated user information from the request context. If there
+		// is no such information in the request context, the found variable will
+		// be false and we call the authenticationRequiredResponse() method to inform
+		// the client that they should authenticate before trying again.
+		authenticatedUser, found := app.contextGetAuthenticatedUser(r)
+		if !found {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+		// If the user is not activated, use the inactiveAccountResponse() helper to
+		// inform them that they need to activate their account.
+		if !authenticatedUser.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Notice that the first argument in the requirePermission() function represents the
+// permission code that we want the user to have.
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check that the user is authenticated and activated, just like before.
+		authenticatedUser, found := app.contextGetAuthenticatedUser(r)
+		if !found {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+		if !authenticatedUser.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+		// Get the slice of permissions for the user.
+		permissions, err := app.models.Permissions.GetAllForUser(authenticatedUser.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+		// Check if the slice includes the required permission. If it doesn't, then
+		// return a 403 Forbidden response.
+		if !permissions.Include(code) {
+			app.missingPermissionResponse(w, r)
+			return
+		}
+		// Otherwise they have the required permission so we call the next handler in
+		// the chain.
 		next.ServeHTTP(w, r)
 	})
 }

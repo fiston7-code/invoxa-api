@@ -7,15 +7,17 @@ import (
 	"github.com/fiston7-code/invoxa-api/internal/validator"
 )
 
-// GET /v1/business/:id - Récupérer les infos pour le formulaire
+// GET /v1/business - Récupérer automatiquement LE profil de l'utilisateur connecté
 func (app *application) getBusinessProfileHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := app.readIDParam(r)
-	if err != nil {
-		app.notFoundResponse(w, r)
+	// 1. On récupère l'user connecté
+	user, ok := app.contextGetAuthenticatedUser(r)
+	if !ok {
+		app.authenticationRequiredResponse(w, r)
 		return
 	}
 
-	profile, err := app.models.BusinessProfiles.Get(id)
+	// 2. On va chercher le profil directement via l'ID de cet utilisateur
+	profile, err := app.models.BusinessProfiles.GetByUserID(user.ID)
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
@@ -26,6 +28,12 @@ func (app *application) getBusinessProfileHandler(w http.ResponseWriter, r *http
 
 // POST /v1/business - Création initiale
 func (app *application) createBusinessProfileHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := app.contextGetAuthenticatedUser(r)
+	if !ok {
+		app.authenticationRequiredResponse(w, r)
+		return
+	}
+
 	var input struct {
 		Name    string `json:"name"`
 		LogoURL string `json:"logo_url"`
@@ -41,6 +49,7 @@ func (app *application) createBusinessProfileHandler(w http.ResponseWriter, r *h
 	}
 
 	profile := &data.BusinessProfile{
+		UserID:  user.ID,
 		Name:    input.Name,
 		LogoURL: input.LogoURL,
 		RCCM:    input.RCCM,
@@ -49,14 +58,12 @@ func (app *application) createBusinessProfileHandler(w http.ResponseWriter, r *h
 		Email:   input.Email,
 	}
 
-	// Validation stricte
 	v := validator.New()
 	if data.ValidateBusinessProfile(v, profile); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	// Insertion
 	if err := app.models.BusinessProfiles.Insert(profile); err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -65,15 +72,17 @@ func (app *application) createBusinessProfileHandler(w http.ResponseWriter, r *h
 	app.writeJSON(w, http.StatusCreated, envelope{"business": profile}, nil)
 }
 
-// PUT /v1/business/:id - Mise à jour
+// PUT /v1/business - Mise à jour du profil de l'utilisateur connecté (Sans ID dans l'URL)
 func (app *application) updateBusinessProfileHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := app.readIDParam(r)
-	if err != nil {
-		app.notFoundResponse(w, r)
+	// 1. On identifie l'user connecté
+	user, ok := app.contextGetAuthenticatedUser(r)
+	if !ok {
+		app.authenticationRequiredResponse(w, r)
 		return
 	}
 
-	profile, err := app.models.BusinessProfiles.Get(id)
+	// 2. On récupère SON profil d'entreprise existant
+	profile, err := app.models.BusinessProfiles.GetByUserID(user.ID)
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
@@ -93,7 +102,6 @@ func (app *application) updateBusinessProfileHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Mise à jour partielle (si le champ est présent dans le JSON)
 	if input.Name != nil {
 		profile.Name = *input.Name
 	}

@@ -11,16 +11,17 @@ import (
 )
 
 type BusinessProfile struct {
-	ID int `json:"id"`
-	// UserID    int64     `json:"-"` // Utilisateur propriétaire
-	Name      string    `json:"name"`
-	LogoURL   string    `json:"logo_url"`
-	RCCM      string    `json:"rccm"`
-	Address   string    `json:"address"`
-	Phone     string    `json:"phone"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         int       `json:"id"`
+	UserID     int       `json:"user_id"`
+	BusinessID int       `json:"business_id"`
+	Name       string    `json:"name"`
+	LogoURL    string    `json:"logo_url"`
+	RCCM       string    `json:"rccm"`
+	Address    string    `json:"address"`
+	Phone      string    `json:"phone"`
+	Email      string    `json:"email"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type BusinessProfileModel struct {
@@ -30,46 +31,44 @@ type BusinessProfileModel struct {
 // Insert crée le profil lors de la première configuration
 func (m BusinessProfileModel) Insert(p *BusinessProfile) error {
 	query := `
-		INSERT INTO business_profiles (name, logo_url, rccm, address, phone, email)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO business_profiles (user_id, name, logo_url, rccm, address, phone, email)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at`
 
-	args := []any{p.Name, p.LogoURL, p.RCCM, p.Address, p.Phone, p.Email}
+	args := []any{p.UserID, p.Name, p.LogoURL, p.RCCM, p.Address, p.Phone, p.Email}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	return m.DB.QueryRowContext(ctx, query, args...).Scan(&p.ID, &p.CreatedAt)
 }
 
-// GetByUserID récupère le profil de l'utilisateur connecté
-// func (m BusinessProfileModel) GetByUserID(userID int64) (*BusinessProfile, error) {
-// 	query := `
-// 		SELECT id, name, logo_url, rccm, address, phone, email, created_at, updated_at
-// 		FROM business_profiles
-// 		WHERE user_id = $1`
+// GetByUserID décommenté et corrigé (Très utile pour le dashboard du user connecté !)
+func (m BusinessProfileModel) GetByUserID(userID int) (*BusinessProfile, error) {
+	query := `
+        SELECT id, user_id, name, logo_url, rccm, address, phone, email, created_at, updated_at
+        FROM business_profiles
+        WHERE user_id = $1`
 
-// 	var p BusinessProfile
-// 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-// 	defer cancel()
+	var p BusinessProfile
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-// 	err := m.DB.QueryRowContext(ctx, query, userID).Scan(
-// 		&p.ID, &p.Name, &p.LogoURL, &p.RCCM, &p.Address, &p.Phone, &p.Email, &p.CreatedAt, &p.UpdatedAt,
-// 	)
+	err := m.DB.QueryRowContext(ctx, query, userID).Scan(
+		&p.ID, &p.UserID, &p.Name, &p.LogoURL, &p.RCCM, &p.Address, &p.Phone, &p.Email, &p.CreatedAt, &p.UpdatedAt,
+	)
 
-// 	if err != nil {
-// 		if errors.Is(err, sql.ErrNoRows) {
-// 			return nil, errors.New("profil non trouvé")
-// 		}
-// 		return nil, err
-// 	}
-// 	p.UserID = userID
-// 	return &p, nil
-// }
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("profil non trouvé")
+		}
+		return nil, err
+	}
+	return &p, nil
+}
 
-// Get récupère un profil business par son ID
 func (m BusinessProfileModel) Get(id int) (*BusinessProfile, error) {
 	query := `
-        SELECT id, name, logo_url, rccm, address, phone, email, created_at, updated_at
+        SELECT id, user_id, name, logo_url, rccm,  address, phone, email, created_at, updated_at
         FROM business_profiles
         WHERE id = $1`
 
@@ -77,8 +76,9 @@ func (m BusinessProfileModel) Get(id int) (*BusinessProfile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	// Correction ici : scan de p.UserID ajouté pour ne pas perdre la liaison
 	err := m.DB.QueryRowContext(ctx, query, id).Scan(
-		&p.ID, &p.Name, &p.LogoURL, &p.RCCM, &p.Address, &p.Phone, &p.Email, &p.CreatedAt, &p.UpdatedAt,
+		&p.ID, &p.UserID, &p.Name, &p.LogoURL, &p.RCCM, &p.Address, &p.Phone, &p.Email, &p.CreatedAt, &p.UpdatedAt,
 	)
 
 	if err != nil {
