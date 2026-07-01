@@ -3,9 +3,7 @@ package mailer
 import (
 	"bytes"
 	"embed"
-	"time"
-
-	"github.com/wneessen/go-mail"
+	"github.com/resend/resend-go/v3"
 
 	// Import the html/template and text/template packages. Because these share the same
 	// package name ("template") we need to disambiguate them and alias them to ht and tt
@@ -27,32 +25,16 @@ var templateFS embed.FS
 // SMTP server) and the sender information for your emails (the name and address you
 // want the email to be from, such as "Alice Smith <alice@example.com>").
 type Mailer struct {
-	client *mail.Client
+	client *resend.Client
 	sender string
 }
 
-func New(host string, port int, username, password, sender string) (*Mailer, error) {
-	// Initialize a new mail.Dialer instance with the given SMTP server settings. We
-	// also configure this to use a 5-second timeout whenever we send an email. I've
-	// split the NewClient arguments over multiple lines for readability, but you can
-	// make this a single line if you prefer.
-	client, err := mail.NewClient(
-		host,
-		mail.WithSMTPAuth(mail.SMTPAuthLogin),
-		mail.WithPort(port),
-		mail.WithUsername(username),
-		mail.WithPassword(password),
-		mail.WithTimeout(5*time.Second),
-	)
-	if err != nil {
-		return nil, err
-	}
-	// Return a Mailer instance containing the client and sender information.
-	mailer := &Mailer{
+func New(apiKey, sender string) (*Mailer, error) {
+	client := resend.NewClient(apiKey)
+	return &Mailer{
 		client: client,
 		sender: sender,
-	}
-	return mailer, nil
+	}, nil
 }
 
 // Define a Send() method on the Mailer type. This takes the recipient email address
@@ -95,29 +77,25 @@ func (m *Mailer) Send(recipient string, templateFile string, data any) error {
 	// Then we use the To(), From() and Subject() methods to set the email recipient,
 	// sender and subject headers, the SetBodyString() method to set the plain-text body,
 	// and the AddAlternativeString() method to set the HTML body.
-	msg := mail.NewMsg()
-	err = msg.To(recipient)
+	params := &resend.SendEmailRequest{
+		From:    m.sender,
+		To:      []string{recipient},
+		Subject: subject.String(),
+		Text:    plainBody.String(),
+		Html:    htmlBody.String(),
+	}
+
+	// Note: Template support in the Go SDK uses the Headers field
+	// to pass template_id. Check the latest SDK docs for the
+	// recommended approach for your version.
+	// For now, this example shows the basic send pattern.
+	// When templates are fully supported in the Go SDK struct,
+	// you would set params.TemplateId and params.TemplateVariables.
+
+	_, err = m.client.Emails.Send(params)
 	if err != nil {
 		return err
 	}
-	err = msg.From(m.sender)
-	if err != nil {
-		return err
-	}
-	msg.Subject(subject.String())
-	msg.SetBodyString(mail.TypeTextPlain, plainBody.String())
-	msg.AddAlternativeString(mail.TypeTextHTML, htmlBody.String())
-	// Try sending the email up to three times before aborting and returning the final
-	// error. We sleep for 500 milliseconds between each attempt.
-	for i := 1; i <= 3; i++ {
-		err = m.client.DialAndSend(msg)
-		if err == nil {
-			return nil
-		}
-		// If it didn't work, sleep for a short time and retry.
-		if i != 3 {
-			time.Sleep(500 * time.Millisecond)
-		}
-	}
-	return err
+
+	return nil
 }

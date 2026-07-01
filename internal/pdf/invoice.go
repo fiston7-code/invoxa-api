@@ -11,27 +11,26 @@ import (
 	"github.com/go-pdf/fpdf"
 )
 
-// GenerateInvoicePDF orchestre la création complète du document PDF stylisé SaaS premium
+// generateReceptPdf generate a professional and modern PDF invoice based on the provided invoice and business profile data.
 func GenerateInvoicePDF(invoice *data.Invoice, businessProfile *data.BusinessProfile) (*bytes.Buffer, error) {
-	// Création du document A4 en mm
+	// create the PDF document with A4 size and millimeter units
 	pdf := fpdf.New("P", "mm", "A4", "")
-
-	// Configuration automatique du footer global
+	// configure the footer for all pages of the PDF
 	setupFooter(pdf, invoice, businessProfile)
 
 	pdf.AddPage()
 
-	// --- DESIGN DE L'ARRIÈRE-PLAN DE LA PAGE ---
-	pdf.SetFillColor(247, 249, 252) // Fond gris/bleu très clair, moderne (#F7F9FC)
+	// design the background of the page with a very light gray/blue color for a modern look
+	pdf.SetFillColor(247, 249, 252) // background color (#F7F9FC)
 	pdf.Rect(0, 0, 210, 297, "F")
 
-	// Carte blanche principale conteneur (Effet de feuille surélevée)
+	// Draw a white rectangle with rounded corners to create a card-like effect for the invoice content
 	pdf.SetFillColor(255, 255, 255)
-	pdf.SetDrawColor(226, 232, 240) // Bordure fine grise (#E2E8F0)
+	pdf.SetDrawColor(226, 232, 240) // Border gray (#E2E8F0)
 	pdf.SetLineWidth(0.3)
 	pdf.RoundedRect(12, 12, 186, 273, 4, "1234", "DF")
 
-	// Marges intérieures à la carte blanche
+	// Margins and auto page break
 	pdf.SetMargins(22, 22, 22)
 	pdf.SetAutoPageBreak(true, 30)
 
@@ -39,7 +38,7 @@ func GenerateInvoicePDF(invoice *data.Invoice, businessProfile *data.BusinessPro
 	var logoFormat string
 	var logoErr error
 
-	// ✅ DYNAMIQUE: Récupère le logo du business profile
+	//  DYNAMIC: fecth the logo from the business profile if available
 	if businessProfile.LogoURL != "" {
 		logoReader, logoFormat, logoErr = fetchImageFromURL(businessProfile.LogoURL)
 		if logoErr != nil {
@@ -50,7 +49,7 @@ func GenerateInvoicePDF(invoice *data.Invoice, businessProfile *data.BusinessPro
 		}
 	}
 
-	// Construction des sections graphiques
+	// Construction of sections of the invoice PDF
 	addHeader(pdf, invoice, businessProfile, logoErr)
 	addClientSection(pdf, invoice)
 	addStatusBanner(pdf, invoice)
@@ -89,74 +88,16 @@ func setupFooter(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Bu
 	})
 }
 
-// func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.BusinessProfile, logoErr error) {
-// 	tr := pdf.UnicodeTranslatorFromDescriptor("")
-
-// 	pdf.SetXY(22, 22)
-
-// 	// ✅ DYNAMIQUE: Logo du business profile
-// 	if businessProfile.LogoURL != "" && logoErr == nil {
-// 		pdf.ImageOptions("business_logo", 22, 22, 35, 0, false, fpdf.ImageOptions{}, 0, "")
-// 	} else {
-// 		// ✅ Fallback: Initialles du nom du business
-// 		pdf.SetFont("Arial", "B", 13)
-// 		pdf.SetTextColor(26, 54, 93)
-
-// 		initials := ""
-// 		if len(businessProfile.Name) > 0 {
-// 			initials = strings.ToUpper(string(businessProfile.Name[0]))
-// 			if len(businessProfile.Name) > 1 {
-// 				for i := 1; i < len(businessProfile.Name); i++ {
-// 					if businessProfile.Name[i] == ' ' && i+1 < len(businessProfile.Name) {
-// 						initials += strings.ToUpper(string(businessProfile.Name[i+1]))
-// 						break
-// 					}
-// 				}
-// 			}
-// 		}
-
-// 		pdf.Cell(100, 5, initials)
-// 		pdf.Ln(4.5)
-// 		pdf.SetX(22)
-// 		pdf.SetFont("Arial", "", 7.5)
-// 		pdf.SetTextColor(113, 128, 150)
-// 		pdf.Cell(100, 4, tr(businessProfile.Name)) // ✅ DYNAMIQUE
-// 	}
-
-// 	// ✅ DYNAMIQUE: Infos du business à droite
-// 	pdf.SetXY(118, 22)
-// 	pdf.SetFont("Arial", "B", 15)
-// 	pdf.SetTextColor(26, 54, 93)
-// 	pdf.CellFormat(70, 6, tr(businessProfile.Name), "0", 1, "R", false, 0, "")
-
-// 	pdf.SetFont("Arial", "", 8.5)
-// 	pdf.SetTextColor(74, 85, 104)
-
-// 	pdf.SetX(118)
-// 	// ✅ DYNAMIQUE: Numéro de reçu
-// 	pdf.CellFormat(70, 4.5, tr(fmt.Sprintf("Reçu N° : %s", invoice.InvoiceNumber)), "0", 1, "R", false, 0, "")
-// 	pdf.SetX(118)
-// 	pdf.CellFormat(70, 4.5, tr(fmt.Sprintf("Email : %s", businessProfile.Email)), "0", 1, "R", false, 0, "")
-// 	pdf.SetX(118)
-// 	pdf.CellFormat(70, 4.5, tr(fmt.Sprintf("Tél : %s", businessProfile.Phone)), "0", 1, "R", false, 0, "")
-
-// 	pdf.SetY(50)
-// 	pdf.SetFont("Arial", "B", 20)
-// 	pdf.SetTextColor(26, 54, 93)
-// 	pdf.CellFormat(166, 10, tr("REÇU"), "0", 1, "C", false, 0, "")
-// 	pdf.Ln(2)
-// }
-
 func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.BusinessProfile, logoErr error) {
 	tr := pdf.UnicodeTranslatorFromDescriptor("")
 
 	pdf.SetXY(22, 22)
 
-	// ✅ DYNAMIQUE: Logo du business profile
+	// DYNAMIQUE: Logo of business profile
 	if businessProfile.LogoURL != "" && logoErr == nil {
 		pdf.ImageOptions("business_logo", 22, 22, 35, 0, false, fpdf.ImageOptions{}, 0, "")
 	} else {
-		// ✅ Fallback: Initialles du nom du business
+		// initalize the initials of the business name if no logo is provided
 		pdf.SetFont("Arial", "B", 13)
 		pdf.SetTextColor(26, 54, 93)
 
@@ -186,7 +127,7 @@ func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Busi
 		pdf.Cell(100, 4, tr(businessName))
 	}
 
-	// ✅ CORRIGÉ: Infos du business à droite avec meilleur spacing
+	// business info on the right side
 	pdf.SetXY(118, 22)
 	pdf.SetFont("Arial", "B", 14)
 	pdf.SetTextColor(26, 54, 93)
@@ -200,7 +141,7 @@ func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Busi
 	pdf.SetFont("Arial", "", 8)
 	pdf.SetTextColor(74, 85, 104)
 
-	// Numéro de reçu
+	// recept number
 	pdf.SetXY(118, 30)
 	pdf.CellFormat(68, 4, tr(fmt.Sprintf("Reçu N° : %s", invoice.InvoiceNumber)), "0", 1, "R", false, 0, "")
 
@@ -212,7 +153,7 @@ func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Busi
 	}
 	pdf.CellFormat(68, 4, tr(fmt.Sprintf("Email : %s", email)), "0", 1, "R", false, 0, "")
 
-	// Téléphone
+	// phone
 	pdf.SetXY(118, 39)
 	phone := businessProfile.Phone
 	if phone == "" {
@@ -246,7 +187,7 @@ func addClientSection(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	pdf.SetFont("Arial", "", 9.5)
 	pdf.SetTextColor(74, 85, 104)
 	pdf.SetXY(26, startY+9)
-	// ✅ DYNAMIQUE: Tous les champs du client
+	// all client details are dynamic and fetched from the invoice object
 	pdf.Cell(80, 5, tr(fmt.Sprintf("Reçu N° : %s", invoice.InvoiceNumber)))
 	pdf.SetXY(26, startY+14)
 	pdf.Cell(80, 5, tr(fmt.Sprintf("Client : %s", invoice.ClientName)))
@@ -273,7 +214,7 @@ func addStatusBanner(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	tr := pdf.UnicodeTranslatorFromDescriptor("")
 	status := strings.ToUpper(invoice.Status)
 
-	// ✅ DYNAMIQUE: Statut dynamique du reçu
+	// status paye on the bottom of the client section with a colored background and a checkmark if paid
 	if status == "PAID" || status == "PAYE" || status == "PAYÉ" {
 		pdf.SetFillColor(240, 253, 244)
 		pdf.SetDrawColor(56, 161, 105)
@@ -327,7 +268,7 @@ func addStatusBanner(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	tr := pdf.UnicodeTranslatorFromDescriptor("")
 
-	// ✅ NOUVELLES LARGEURS (Total = 175.0)
+	// definitoon of column widths and starting X position
 	idxWidth := 10.0
 	descWidth := 70.0
 	qtyWidth := 20.0
@@ -336,8 +277,8 @@ func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	xStart := 22.0
 
 	// HEADER
-	pdf.SetFillColor(26, 54, 93)    // Bleu marine
-	pdf.SetTextColor(255, 255, 255) // Blanc
+	pdf.SetFillColor(26, 54, 93)    // color blue for header
+	pdf.SetTextColor(255, 255, 255) // white text for header
 	pdf.SetFont("Arial", "B", 9.5)
 
 	pdf.SetX(xStart)
@@ -350,9 +291,9 @@ func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	pdf.SetTextColor(45, 55, 72)
 	pdf.SetFont("Arial", "", 9.5)
 
-	// ITEMS avec ALTERNANCE ET NUMÉROTATION
+	// items rows with alternating colors for better readability
 	for i, item := range invoice.Items {
-		// ✅ ALTERNANCE DES COULEURS
+		// coulors to make the table more readable with alternating row colors
 		if i%2 == 0 {
 			pdf.SetFillColor(248, 250, 252) // Gris très clair
 		} else {
@@ -395,125 +336,6 @@ func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	}
 }
 
-// func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
-// 	tr := pdf.UnicodeTranslatorFromDescriptor("")
-
-// 	// ✅ DÉFINIR LES LARGEURS
-// 	descWidth := 80.0
-// 	qtyWidth := 20.0
-// 	priceWidth := 33.0
-// 	totalWidth := 33.0
-
-// 	// HEADER
-// 	pdf.SetFillColor(26, 54, 93)    // Bleu marine
-// 	pdf.SetTextColor(255, 255, 255) // Blanc
-// 	pdf.SetFont("Arial", "B", 9.5)
-
-// 	pdf.SetX(22)
-// 	pdf.CellFormat(descWidth, 9, "Description", "0", 0, "L", true, 0, "")
-// 	pdf.CellFormat(qtyWidth, 9, "Qté", "0", 0, "C", true, 0, "") // ✅ "Qté" au lieu de "QtÂ©"
-// 	pdf.CellFormat(priceWidth, 9, "Prix Unitaire", "0", 0, "C", true, 0, "")
-// 	pdf.CellFormat(totalWidth, 9, "Total", "0", 1, "R", true, 0, "")
-
-// 	pdf.SetTextColor(45, 55, 72)
-// 	pdf.SetFont("Arial", "", 9.5)
-
-// 	// ITEMS avec ALTERNANCE GRIS/BLANC
-// 	for i, item := range invoice.Items {
-// 		// ✅ ALTERNANCE: Gris pour pairs, Blanc pour impairs
-// 		if i%2 == 0 {
-// 			pdf.SetFillColor(248, 250, 252) // Gris très clair
-// 		} else {
-// 			pdf.SetFillColor(255, 255, 255) // Blanc
-// 		}
-
-// 		x := 22.0
-// 		y := pdf.GetY()
-
-// 		// ✅ DYNAMIQUE: Calcul automatique des prix
-// 		uPrice := float64(item.UnitPrice) / 100.0
-// 		lTotal := (float64(item.UnitPrice) * float64(item.Quantity)) / 100.0
-
-// 		pdf.SetDrawColor(237, 242, 247)
-// 		pdf.SetLineWidth(0.3)
-
-// 		// Description (peut être multi-ligne)
-// 		pdf.SetXY(x, y)
-// 		pdf.MultiCell(descWidth, 3.5, tr(item.Description), "B", "L", true)
-// 		nextY := pdf.GetY()
-
-// 		// ✅ Même hauteur pour toutes les colonnes
-// 		// Quantité
-// 		pdf.SetXY(x+descWidth, y)
-// 		pdf.CellFormat(qtyWidth, nextY-y, tr(fmt.Sprintf("%d", item.Quantity)), "B", 0, "C", true, 0, "")
-
-// 		// Prix Unitaire
-// 		pdf.SetXY(x+descWidth+qtyWidth, y)
-// 		pdf.CellFormat(priceWidth, nextY-y, tr(fmt.Sprintf("%.2f %s", uPrice, invoice.Currency)), "B", 0, "C", true, 0, "")
-
-// 		// Total
-// 		pdf.SetXY(x+descWidth+qtyWidth+priceWidth, y)
-// 		pdf.CellFormat(totalWidth, nextY-y, tr(fmt.Sprintf("%.2f %s", lTotal, invoice.Currency)), "B", 1, "R", true, 0, "")
-
-// 		pdf.SetY(nextY)
-// 	}
-// }
-
-// func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
-// 	tr := pdf.UnicodeTranslatorFromDescriptor("")
-// 	idxWidth, descWidth, qtyWidth, priceWidth, totalWidth := 10.0, 75.0, 20.0, 35.0, 35.0
-// 	xStart := 22.0
-
-// 	// 1. HEADER AVEC EFFET "SHADOW" SIMULÉ
-// 	// On dessine un rectangle gris décalé pour simuler une ombre
-// 	pdf.SetFillColor(200, 200, 200)
-// 	pdf.Rect(xStart+0.5, pdf.GetY()+0.5, 175.0, 8.0, "F")
-
-// 	pdf.SetFillColor(26, 54, 93) // Couleur principale titre
-// 	pdf.SetTextColor(255, 255, 255)
-// 	pdf.SetFont("Arial", "B", 9)
-// 	pdf.SetX(xStart)
-
-// 	pdf.CellFormat(idxWidth, 8, "#", "0", 0, "C", true, 0, "")
-// 	pdf.CellFormat(descWidth, 8, "Description", "0", 0, "L", true, 0, "")
-// 	pdf.CellFormat(qtyWidth, 8, "Qté", "0", 0, "C", true, 0, "")
-// 	pdf.CellFormat(priceWidth, 8, "Prix Unit.", "0", 0, "C", true, 0, "")
-// 	pdf.CellFormat(totalWidth, 8, "Total", "0", 1, "R", true, 0, "")
-
-// 	// 2. ITEMS AVEC ALTERNANCE "BLANC CASSÉ"
-// 	pdf.SetTextColor(45, 55, 72)
-// 	pdf.SetFont("Arial", "", 9.5)
-
-// 	for i, item := range invoice.Items {
-// 		// Alternance : Blanc pur vs Blanc cassé (248, 250, 252)
-// 		if i%2 != 0 {
-// 			pdf.SetFillColor(248, 250, 252) // Blanc cassé
-// 		} else {
-// 			pdf.SetFillColor(255, 255, 255) // Blanc
-// 		}
-
-// 		y := pdf.GetY()
-// 		pdf.SetXY(xStart, y)
-
-// 		// Index
-// 		pdf.CellFormat(idxWidth, 8, fmt.Sprintf("%d", i+1), "0", 0, "C", true, 0, "")
-
-// 		// Description
-// 		pdf.MultiCell(descWidth, 8, "  "+tr(item.Description), "0", "L", true)
-// 		h := pdf.GetY() - y
-
-// 		// Autres colonnes
-// 		pdf.SetXY(xStart+idxWidth+descWidth, y)
-// 		pdf.CellFormat(qtyWidth, h, fmt.Sprintf("%d", item.Quantity), "0", 0, "C", true, 0, "")
-
-// 		uPrice := float64(item.UnitPrice) / 100.0
-// 		pdf.CellFormat(priceWidth, h, fmt.Sprintf("%.2f %s", uPrice, invoice.Currency), "0", 0, "C", true, 0, "")
-
-// 		lTotal := (float64(item.UnitPrice) * float64(item.Quantity)) / 100.0
-// 		pdf.CellFormat(totalWidth, h, fmt.Sprintf("%.2f %s", lTotal, invoice.Currency), "0", 1, "R", true, 0, "")
-// 	}
-// }
-
 func addTotalsAndStamp(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	tr := pdf.UnicodeTranslatorFromDescriptor("")
 	pdf.Ln(5)
@@ -521,7 +343,7 @@ func addTotalsAndStamp(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 
 	status := strings.ToUpper(invoice.Status)
 
-	// ✅ DYNAMIQUE: Affiche le tampon PAYÉ si le statut est paid
+	// bagde "PAYÉ" ou "PAID" ou "PAYE" on the top left corner of the totals section
 	if status == "PAID" || status == "PAYE" || status == "PAYÉ" {
 		pdf.TransformBegin()
 		pdf.SetAlpha(0.35, "Normal")
@@ -546,7 +368,7 @@ func addTotalsAndStamp(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 		pdf.SetAlpha(1.0, "Normal")
 	}
 
-	// ✅ DYNAMIQUE: Montant total
+	// total amount in float
 	finalTotal := float64(invoice.TotalAmount) / 100.0
 
 	pdf.SetXY(100, currentY+4)
@@ -568,7 +390,7 @@ func addNotes(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 		return
 	}
 
-	// ✅ DYNAMIQUE: Titre de la note
+	// note title fallback
 	pdf.SetX(22)
 	pdf.SetFont("Arial", "B", 10)
 	pdf.SetTextColor(26, 54, 93)
@@ -584,7 +406,7 @@ func addNotes(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	pdf.SetFont("Arial", "", 8.5)
 	pdf.SetTextColor(113, 128, 150)
 
-	// ✅ DYNAMIQUE: Texte de la note
+	// note text fallback
 	if invoice.NoteText != "" {
 		pdf.MultiCell(166, 4, tr(invoice.NoteText), "", "C", false)
 	}
@@ -603,12 +425,12 @@ func addNotesFooter(pdf *fpdf.Fpdf, businessProfile *data.BusinessProfile) {
 	pdf.SetFont("Arial", "", 8.5)
 	pdf.SetTextColor(113, 128, 150)
 
-	// ✅ DYNAMIQUE: Coordonnées du business
+	// business address fallback
 	contactPrompt := fmt.Sprintf("Pour toute question, contactez-nous : %s  |  %s  |  %s",
 		businessProfile.Email, businessProfile.Phone, businessProfile.Address)
 	pdf.CellFormat(166, 4, tr(contactPrompt), "", 1, "C", false, 0, "")
 
-	// ✅ NOUVEAU: Date de génération
+	//  new date generation line
 	pdf.Ln(2)
 	pdf.SetX(22)
 	pdf.SetFont("Arial", "", 7)

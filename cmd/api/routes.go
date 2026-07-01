@@ -30,11 +30,6 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPatch, "/v1/invoices/:id", app.requirePermission("invoices:write", app.updateInvoiceHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/invoices/:id", app.requirePermission("invoices:write", app.deleteInvoiceHandler))
 
-	// --- ROUTES PRIVÉES : BUSINESS (Sécurisées au moins par Authentification + Activation) ---
-	// router.HandlerFunc(http.MethodGet, "/v1/business/:id", app.requireActivatedUser(app.getBusinessProfileHandler))
-	// router.HandlerFunc(http.MethodPost, "/v1/business", app.requireActivatedUser(app.createBusinessProfileHandler))
-	// router.HandlerFunc(http.MethodPatch, "/v1/business/:id", app.requireActivatedUser(app.updateBusinessProfileHandler))
-
 	// Dans routes.go
 	// ✅ CORRECT: GET sans :id pour récupérer LE profil de l'user connecté
 	router.HandlerFunc(http.MethodGet, "/v1/business", app.requireActivatedUser(app.getBusinessProfileHandler))
@@ -46,7 +41,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPatch, "/v1/business/:id", app.requireActivatedUser(app.updateBusinessProfileHandler))
 	// Remplace HandlerFunc par Handler
 	// Dans routes.go
-	router.Handler(http.MethodPost, "/v1/test-upload", app.requireActivatedUser(http.HandlerFunc(app.testUploadHandler)))
+	// router.Handler(http.MethodPost, "/v1/test-upload", app.requireActivatedUser(http.HandlerFunc(app.testUploadHandler)))
+	router.Handler(http.MethodPost, "/v1/business/logo", app.requireActivatedUser(http.HandlerFunc(app.uploadLogoHandler)))
 
 	// Chaîne globale des middlewares applicatifs
 	return app.recoverPanic(app.rateLimit(app.enableCORS(app.authenticate(router))))

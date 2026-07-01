@@ -44,13 +44,9 @@ type config struct {
 		burst   int
 		enabled bool
 	}
-
-	smtp struct {
-		host     string
-		port     int
-		username string
-		password string
-		sender   string
+	resend struct {
+		apiKey string
+		sender string
 	}
 
 	// Add a cors struct and trustedOrigins field with the type []string.
@@ -94,19 +90,8 @@ func main() {
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 
-	// Read the SMTP server configuration settings into the config struct, using the
-	// Mailtrap settings as the default values. IMPORTANT: If you're following along,
-	// make sure to replace the default values for smtp-username and smtp-password
-	// with your own Mailtrap credentials.
-	flag.StringVar(&cfg.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
-
-	flag.IntVar(&cfg.smtp.port, "smtp-port", 2525, "SMTP port")
-
-	flag.StringVar(&cfg.smtp.username, "smtp-username", "16f7ba60006520", "SMTP username")
-
-	flag.StringVar(&cfg.smtp.password, "smtp-password", "62511c9cc4a406", "SMTP password")
-
-	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "invoxa <no-reply@invoxa.fiston.net>", "SMTP sender")
+	flag.StringVar(&cfg.resend.apiKey, "resend-api-key", os.Getenv("RESEND_API_KEY"), "Resend API Key")
+	flag.StringVar(&cfg.resend.sender, "resend-sender", "fastvoxa <no-reply@fastvoxa.com>", "Resend sender")
 
 	// Use the flag.Func() function to process the -cors-trusted-origins command line
 	// flag. In this we use the strings.Fields() function to split the flag value into a
@@ -137,9 +122,12 @@ func main() {
 	// established.
 	logger.Info("database connection pool established")
 
-	// Initialize a new Mailer instance using the settings from the command line
-	// flags.
-	mailer, err := mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender)
+	if cfg.resend.apiKey == "" {
+		logger.Error("RESEND_API_KEY is missing")
+		os.Exit(1)
+	}
+
+	mailer, err := mailer.New(cfg.resend.apiKey, cfg.resend.sender)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)

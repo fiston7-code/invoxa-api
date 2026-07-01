@@ -134,3 +134,30 @@ func (app *application) updateBusinessProfileHandler(w http.ResponseWriter, r *h
 
 	app.writeJSON(w, http.StatusOK, envelope{"business": profile}, nil)
 }
+
+func (app *application) uploadLogoHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Parser le formulaire multipart avec une limite de 5 Mo (5 << 20 octets)
+	err := r.ParseMultipartForm(5 << 20)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// 2. Récupérer le fichier via le champ "logo" envoyé par Next.js
+	file, header, err := r.FormFile("logo")
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	defer file.Close() // Toujours fermer le fichier après utilisation
+
+	// 3. Appeler votre fonction d'upload (celle que vous avez définie précédemment)
+	url, err := app.uploadBusinessLogo(header)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// 4. Retourner l'URL au format JSON pour que Next.js puisse l'utiliser
+	app.writeJSON(w, http.StatusOK, envelope{"url": url}, nil)
+}
