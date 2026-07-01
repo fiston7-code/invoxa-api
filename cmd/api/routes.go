@@ -9,39 +9,36 @@ import (
 func (app *application) routes() http.Handler {
 	router := httprouter.New()
 
-	// Configurer les gestionnaires d'erreurs personnalisés
+	// Set custom error handlers for 404 Not Found and 405 Method Not Allowed responses.
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
 
-	// --- ROUTES PUBLIQUES ---
+	// --- ROUTES PUBLIC ---
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
 	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.createAuthenticationTokenHandler)
 
-	// --- ROUTES PRIVÉES : FACTURES (Protégées par Permissions) ---
-	// Lecture (Besoin de invoices:read)
+	// private routes : RECEIPT (Protected by Permissions) ---
+	// read (need to read  invoices:read)
 	router.HandlerFunc(http.MethodGet, "/v1/invoices", app.requirePermission("invoices:read", app.listInvoicesHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id", app.requirePermission("invoices:read", app.showInvoiceHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/invoices/:id/pdf", app.requirePermission("invoices:read", app.downloadInvoicePDFHandler))
 
-	// Écritures / Modifications / Suppressions (Alignés sur invoices:write en BDD)
+	// write (need  invoices:write)
 	router.HandlerFunc(http.MethodPost, "/v1/invoices", app.requirePermission("invoices:write", app.createInvoiceHandler))
 	router.HandlerFunc(http.MethodPatch, "/v1/invoices/:id", app.requirePermission("invoices:write", app.updateInvoiceHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/invoices/:id", app.requirePermission("invoices:write", app.deleteInvoiceHandler))
 
 	// Dans routes.go
-	// ✅ CORRECT: GET sans :id pour récupérer LE profil de l'user connecté
+	// fecth business profile (GET) and update it (PATCH)
 	router.HandlerFunc(http.MethodGet, "/v1/business", app.requireActivatedUser(app.getBusinessProfileHandler))
 
-	// POST pour créer
+	// for creating a business profile (POST) and updating it (PATCH)
 	router.HandlerFunc(http.MethodPost, "/v1/business", app.requireActivatedUser(app.createBusinessProfileHandler))
 
 	// PATCH avec :id pour modifier un profil spécifique (optionnel)
 	router.HandlerFunc(http.MethodPatch, "/v1/business/:id", app.requireActivatedUser(app.updateBusinessProfileHandler))
-	// Remplace HandlerFunc par Handler
-	// Dans routes.go
-	// router.Handler(http.MethodPost, "/v1/test-upload", app.requireActivatedUser(http.HandlerFunc(app.testUploadHandler)))
 	router.Handler(http.MethodPost, "/v1/business/logo", app.requireActivatedUser(http.HandlerFunc(app.uploadLogoHandler)))
 
 	// Chaîne globale des middlewares applicatifs
