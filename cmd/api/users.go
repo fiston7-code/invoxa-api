@@ -66,6 +66,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		// contains the plaintext version of the activation token for the user, along
 		// with their ID.
 		data := map[string]any{
+			"userName":        user.Name,
 			"activationToken": token.Plaintext,
 			"userID":          user.ID,
 		}

@@ -28,7 +28,7 @@ func initCloudinary() (*cloudinary.Cloudinary, error) {
 // uploadBusinessLogo remplace ton ancienne fonction uploadImage()
 // Elle est maintenant rattachée à ta structure globale "application"
 func (app *application) uploadBusinessLogo(fileHeader *multipart.FileHeader) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// 1. Ouvrir le fichier multipart envoyé par Next.js

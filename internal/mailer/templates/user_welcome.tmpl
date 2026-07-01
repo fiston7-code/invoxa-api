@@ -1,17 +1,16 @@
 {{define "subject"}}Bienvenue sur Invoxa !{{end}}
 
 {{define "plainBody"}}
-Bonjour,
+Bonjour {{.userName}},
 
-Merci de vous être inscrit sur Invoxa. Nous sommes ravis de vous compter parmi nous !
+Merci de vous être inscrit sur Invoxa.
 
-Pour rappel, votre numéro d'utilisateur est le {{.userID}}.
+Veuillez copier le code suivant pour activer votre compte :
+{{.activationToken}}
 
-Veuillez envoyer une requête PUT à l'endpoint /v1/users/activated avec le corps JSON suivant pour activer votre compte :
+Veuillez noter qu'il s'agit d'un code à usage unique et qu'il expirera dans 3 jours.
 
-{"token": "{{.activationToken}}"}
-
-Veuillez noter qu'il s'agit d'un jeton à usage unique et qu'il expirera dans 3 jours.
+Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.
 
 Merci,
 L'équipe Invoxa
@@ -27,17 +26,21 @@ L'équipe Invoxa
 <body style="font-family: sans-serif; color: #333333; background-color: #f6f9fc; padding: 20px;">
     <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
         <h2 style="color: #1a365d; margin-top: 0;">Bienvenue sur Invoxa !</h2>
-        <p>Bonjour,</p>
+        <p>Bonjour {{.userName}},</p>
         <p>Merci de vous être inscrit sur <strong>Invoxa</strong>. Nous sommes ravis de vous compter parmi nous !</p>
-        <p>Pour rappel, votre numéro d'utilisateur est le <strong>{{.userID}}</strong>.</p>
         
-        <p>Veuillez envoyer une requête <code>PUT</code> à l'endpoint <code>/v1/users/activated</code> avec le corps JSON suivant pour activer votre compte :</p>
+        <p>Veuillez copier le code suivant dans le formulaire pour activer votre compte :</p>
         
-        <div style="background-color: #edf2f7; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 14px; margin: 20px 0; overflow-x: auto;">
-            <code>{"token": "{{.activationToken}}"}</code>
+        <div style="background-color: #edf2f7; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 18px; text-align: center; margin: 20px 0;">
+            <strong>{{.activationToken}}</strong>
         </div>
         
-        <p style="font-size: 14px; color: #4a5568;"><em>Note : Ce jeton est à usage unique et expirera dans 3 jours.</em></p>
+        <p style="font-size: 14px; color: #4a5568;"><em>Note : Ce code est à usage unique et expirera dans 3 jours.</em></p>
+        
+        <p style="font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            Si vous n'avez pas créé de compte sur Invoxa ou si vous avez reçu cet e-mail par erreur, veuillez ignorer ce message.
+        </p>
+        
         <br />
         <p style="margin-bottom: 0;">Merci,</p>
         <p style="margin-top: 5px; font-weight: bold; color: #2b6cb0;">L'équipe Invoxa</p>

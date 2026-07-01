@@ -82,7 +82,7 @@ func setupFooter(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Bu
 
 		pdf.SetX(22)
 		tr := pdf.UnicodeTranslatorFromDescriptor("")
-		footerText := tr("Ce document est généré automatiquement et constitue une preuve de paiement officielle.")
+		footerText := tr("Reçu généré par Fastvoxa.com - Plateforme de génération de reçus en ligne")
 		pdf.CellFormat(120, 4, footerText, "0", 0, "L", false, 0, "")
 
 		pdf.SetX(148)
@@ -210,7 +210,7 @@ func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Busi
 	if email == "" {
 		email = "—"
 	}
-	pdf.CellFormat(68, 4, tr(fmt.Sprintf("Email : %s", businessProfile.Email)), "0", 1, "R", false, 0, "")
+	pdf.CellFormat(68, 4, tr(fmt.Sprintf("Email : %s", email)), "0", 1, "R", false, 0, "")
 
 	// Téléphone
 	pdf.SetXY(118, 39)
@@ -218,7 +218,7 @@ func addHeader(pdf *fpdf.Fpdf, invoice *data.Invoice, businessProfile *data.Busi
 	if phone == "" {
 		phone = "—"
 	}
-	pdf.CellFormat(68, 4, tr(fmt.Sprintf("Tél : %s", businessProfile.Phone)), "0", 1, "R", false, 0, "")
+	pdf.CellFormat(68, 4, tr(fmt.Sprintf("Tél : %s", phone)), "0", 1, "R", false, 0, "")
 
 	pdf.SetY(50)
 	pdf.SetFont("Arial", "B", 20)
@@ -262,6 +262,8 @@ func addClientSection(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	if invoice.ClientEmail != "" {
 		pdf.SetXY(118, startY+19)
 		pdf.CellFormat(70, 5, tr(fmt.Sprintf("Email : %s", invoice.ClientEmail)), "0", 0, "R", false, 0, "")
+		pdf.SetXY(118, startY+24)
+		pdf.CellFormat(70, 5, tr(fmt.Sprintf("Tél : %s", invoice.ClientPhone)), "0", 0, "R", false, 0, "")
 	}
 
 	pdf.SetY(startY + 29)
@@ -324,44 +326,193 @@ func addStatusBanner(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 
 func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	tr := pdf.UnicodeTranslatorFromDescriptor("")
-	pdf.SetFillColor(26, 54, 93)
-	pdf.SetTextColor(255, 255, 255)
+
+	// ✅ NOUVELLES LARGEURS (Total = 175.0)
+	idxWidth := 10.0
+	descWidth := 70.0
+	qtyWidth := 20.0
+	priceWidth := 37.5
+	totalWidth := 37.5
+	xStart := 22.0
+
+	// HEADER
+	pdf.SetFillColor(26, 54, 93)    // Bleu marine
+	pdf.SetTextColor(255, 255, 255) // Blanc
 	pdf.SetFont("Arial", "B", 9.5)
 
-	pdf.SetX(22)
-	pdf.CellFormat(96, 9, "Description", "0", 0, "L", true, 0, "")
-	pdf.CellFormat(35, 9, "Prix Unitaire", "0", 0, "C", true, 0, "")
-	pdf.CellFormat(35, 9, "Total", "0", 1, "R", true, 0, "")
+	pdf.SetX(xStart)
+	pdf.CellFormat(idxWidth, 9, "#", "0", 0, "C", true, 0, "")
+	pdf.CellFormat(descWidth, 9, "Description", "0", 0, "L", true, 0, "")
+	pdf.CellFormat(qtyWidth, 9, "Qty", "0", 0, "C", true, 0, "")
+	pdf.CellFormat(priceWidth, 9, "Prix Unitaire", "0", 0, "C", true, 0, "")
+	pdf.CellFormat(totalWidth, 9, "Total", "0", 1, "R", true, 0, "")
 
 	pdf.SetTextColor(45, 55, 72)
 	pdf.SetFont("Arial", "", 9.5)
 
+	// ITEMS avec ALTERNANCE ET NUMÉROTATION
 	for i, item := range invoice.Items {
+		// ✅ ALTERNANCE DES COULEURS
 		if i%2 == 0 {
-			pdf.SetFillColor(255, 255, 255)
+			pdf.SetFillColor(248, 250, 252) // Gris très clair
 		} else {
-			pdf.SetFillColor(248, 250, 252)
+			pdf.SetFillColor(255, 255, 255) // Blanc
 		}
 
-		x, y := 22.0, pdf.GetY()
-		pdf.SetXY(x, y)
+		y := pdf.GetY()
 
-		// ✅ DYNAMIQUE: Calcul automatique des prix
+		// Calculs prix
 		uPrice := float64(item.UnitPrice) / 100.0
 		lTotal := (float64(item.UnitPrice) * float64(item.Quantity)) / 100.0
 
 		pdf.SetDrawColor(237, 242, 247)
 		pdf.SetLineWidth(0.3)
-		pdf.MultiCell(96, 8, tr(item.Description), "B", "L", true)
-		nextY := pdf.GetY()
 
-		pdf.SetXY(x+96, y)
-		pdf.CellFormat(35, nextY-y, tr(fmt.Sprintf("%.2f %s", uPrice, invoice.Currency)), "B", 0, "C", true, 0, "")
-		pdf.CellFormat(35, nextY-y, tr(fmt.Sprintf("%.2f %s", lTotal, invoice.Currency)), "B", 1, "R", true, 0, "")
+		// 1. Colonne Index (#)
+		pdf.SetXY(xStart, y)
+		pdf.CellFormat(idxWidth, 8, fmt.Sprintf("%d", i+1), "B", 0, "C", true, 0, "")
+
+		// 2. Description (MultiCell)
+		pdf.SetXY(xStart+idxWidth, y)
+		pdf.MultiCell(descWidth, 8, "  "+tr(item.Description), "B", "L", true)
+
+		nextY := pdf.GetY()
+		h := nextY - y
+
+		// 3. Qté
+		pdf.SetXY(xStart+idxWidth+descWidth, y)
+		pdf.CellFormat(qtyWidth, h, fmt.Sprintf("%d", item.Quantity), "B", 0, "C", true, 0, "")
+
+		// 4. Prix Unitaire
+		pdf.SetXY(xStart+idxWidth+descWidth+qtyWidth, y)
+		pdf.CellFormat(priceWidth, h, fmt.Sprintf("%.2f %s", uPrice, invoice.Currency), "B", 0, "C", true, 0, "")
+
+		// 5. Total
+		pdf.SetXY(xStart+idxWidth+descWidth+qtyWidth+priceWidth, y)
+		pdf.CellFormat(totalWidth, h, fmt.Sprintf("%.2f %s", lTotal, invoice.Currency), "B", 1, "R", true, 0, "")
 
 		pdf.SetY(nextY)
 	}
 }
+
+// func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
+// 	tr := pdf.UnicodeTranslatorFromDescriptor("")
+
+// 	// ✅ DÉFINIR LES LARGEURS
+// 	descWidth := 80.0
+// 	qtyWidth := 20.0
+// 	priceWidth := 33.0
+// 	totalWidth := 33.0
+
+// 	// HEADER
+// 	pdf.SetFillColor(26, 54, 93)    // Bleu marine
+// 	pdf.SetTextColor(255, 255, 255) // Blanc
+// 	pdf.SetFont("Arial", "B", 9.5)
+
+// 	pdf.SetX(22)
+// 	pdf.CellFormat(descWidth, 9, "Description", "0", 0, "L", true, 0, "")
+// 	pdf.CellFormat(qtyWidth, 9, "Qté", "0", 0, "C", true, 0, "") // ✅ "Qté" au lieu de "QtÂ©"
+// 	pdf.CellFormat(priceWidth, 9, "Prix Unitaire", "0", 0, "C", true, 0, "")
+// 	pdf.CellFormat(totalWidth, 9, "Total", "0", 1, "R", true, 0, "")
+
+// 	pdf.SetTextColor(45, 55, 72)
+// 	pdf.SetFont("Arial", "", 9.5)
+
+// 	// ITEMS avec ALTERNANCE GRIS/BLANC
+// 	for i, item := range invoice.Items {
+// 		// ✅ ALTERNANCE: Gris pour pairs, Blanc pour impairs
+// 		if i%2 == 0 {
+// 			pdf.SetFillColor(248, 250, 252) // Gris très clair
+// 		} else {
+// 			pdf.SetFillColor(255, 255, 255) // Blanc
+// 		}
+
+// 		x := 22.0
+// 		y := pdf.GetY()
+
+// 		// ✅ DYNAMIQUE: Calcul automatique des prix
+// 		uPrice := float64(item.UnitPrice) / 100.0
+// 		lTotal := (float64(item.UnitPrice) * float64(item.Quantity)) / 100.0
+
+// 		pdf.SetDrawColor(237, 242, 247)
+// 		pdf.SetLineWidth(0.3)
+
+// 		// Description (peut être multi-ligne)
+// 		pdf.SetXY(x, y)
+// 		pdf.MultiCell(descWidth, 3.5, tr(item.Description), "B", "L", true)
+// 		nextY := pdf.GetY()
+
+// 		// ✅ Même hauteur pour toutes les colonnes
+// 		// Quantité
+// 		pdf.SetXY(x+descWidth, y)
+// 		pdf.CellFormat(qtyWidth, nextY-y, tr(fmt.Sprintf("%d", item.Quantity)), "B", 0, "C", true, 0, "")
+
+// 		// Prix Unitaire
+// 		pdf.SetXY(x+descWidth+qtyWidth, y)
+// 		pdf.CellFormat(priceWidth, nextY-y, tr(fmt.Sprintf("%.2f %s", uPrice, invoice.Currency)), "B", 0, "C", true, 0, "")
+
+// 		// Total
+// 		pdf.SetXY(x+descWidth+qtyWidth+priceWidth, y)
+// 		pdf.CellFormat(totalWidth, nextY-y, tr(fmt.Sprintf("%.2f %s", lTotal, invoice.Currency)), "B", 1, "R", true, 0, "")
+
+// 		pdf.SetY(nextY)
+// 	}
+// }
+
+// func addItemsTable(pdf *fpdf.Fpdf, invoice *data.Invoice) {
+// 	tr := pdf.UnicodeTranslatorFromDescriptor("")
+// 	idxWidth, descWidth, qtyWidth, priceWidth, totalWidth := 10.0, 75.0, 20.0, 35.0, 35.0
+// 	xStart := 22.0
+
+// 	// 1. HEADER AVEC EFFET "SHADOW" SIMULÉ
+// 	// On dessine un rectangle gris décalé pour simuler une ombre
+// 	pdf.SetFillColor(200, 200, 200)
+// 	pdf.Rect(xStart+0.5, pdf.GetY()+0.5, 175.0, 8.0, "F")
+
+// 	pdf.SetFillColor(26, 54, 93) // Couleur principale titre
+// 	pdf.SetTextColor(255, 255, 255)
+// 	pdf.SetFont("Arial", "B", 9)
+// 	pdf.SetX(xStart)
+
+// 	pdf.CellFormat(idxWidth, 8, "#", "0", 0, "C", true, 0, "")
+// 	pdf.CellFormat(descWidth, 8, "Description", "0", 0, "L", true, 0, "")
+// 	pdf.CellFormat(qtyWidth, 8, "Qté", "0", 0, "C", true, 0, "")
+// 	pdf.CellFormat(priceWidth, 8, "Prix Unit.", "0", 0, "C", true, 0, "")
+// 	pdf.CellFormat(totalWidth, 8, "Total", "0", 1, "R", true, 0, "")
+
+// 	// 2. ITEMS AVEC ALTERNANCE "BLANC CASSÉ"
+// 	pdf.SetTextColor(45, 55, 72)
+// 	pdf.SetFont("Arial", "", 9.5)
+
+// 	for i, item := range invoice.Items {
+// 		// Alternance : Blanc pur vs Blanc cassé (248, 250, 252)
+// 		if i%2 != 0 {
+// 			pdf.SetFillColor(248, 250, 252) // Blanc cassé
+// 		} else {
+// 			pdf.SetFillColor(255, 255, 255) // Blanc
+// 		}
+
+// 		y := pdf.GetY()
+// 		pdf.SetXY(xStart, y)
+
+// 		// Index
+// 		pdf.CellFormat(idxWidth, 8, fmt.Sprintf("%d", i+1), "0", 0, "C", true, 0, "")
+
+// 		// Description
+// 		pdf.MultiCell(descWidth, 8, "  "+tr(item.Description), "0", "L", true)
+// 		h := pdf.GetY() - y
+
+// 		// Autres colonnes
+// 		pdf.SetXY(xStart+idxWidth+descWidth, y)
+// 		pdf.CellFormat(qtyWidth, h, fmt.Sprintf("%d", item.Quantity), "0", 0, "C", true, 0, "")
+
+// 		uPrice := float64(item.UnitPrice) / 100.0
+// 		pdf.CellFormat(priceWidth, h, fmt.Sprintf("%.2f %s", uPrice, invoice.Currency), "0", 0, "C", true, 0, "")
+
+// 		lTotal := (float64(item.UnitPrice) * float64(item.Quantity)) / 100.0
+// 		pdf.CellFormat(totalWidth, h, fmt.Sprintf("%.2f %s", lTotal, invoice.Currency), "0", 1, "R", true, 0, "")
+// 	}
+// }
 
 func addTotalsAndStamp(pdf *fpdf.Fpdf, invoice *data.Invoice) {
 	tr := pdf.UnicodeTranslatorFromDescriptor("")
