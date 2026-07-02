@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -71,7 +74,7 @@ func main() {
 
 	// 2. Charger le fichier .env avant d'évaluer les variables d'environnement des flags
 	// On ignore l'erreur car en production sur DigitalOcean, les variables sont injectées directement.
-	_ = godotenv.Load()
+	_ = godotenv.Load(".envrc")
 
 	var cfg config
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
@@ -103,6 +106,16 @@ func main() {
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
+
+	// Create a new version boolean flag with the default value of false.
+	displayVersion := flag.Bool("version", false, "Display version and exit")
+	flag.Parse()
+	// If the version flag value is true, then print out the version number and
+	// immediately exit.
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		os.Exit(0)
+	}
 
 	flag.Parse()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -140,6 +153,21 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("cloudinary client successfully initialized")
+
+	expvar.NewString("version").Set(version)
+
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
 
 	app := &application{
 		config:     cfg,

@@ -127,6 +127,8 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 // The readCSV() helper reads a string value from the query string and then splits it
 // into a slice on the comma character. If no matching key could be found, it returns
 // the provided default value.
+
+//lint:ignore U1000 middleware currently unused, but might be in the future
 func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
 	// Extract the value from the query string.
 	csv := qs.Get(key)

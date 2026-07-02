@@ -72,4 +72,8 @@ func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 		},
 		"user": user, // ✅ Bonus: Envoie aussi l'user
 	}, nil)
+
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }

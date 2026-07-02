@@ -100,3 +100,8 @@ func (app *application) missingPermissionResponse(w http.ResponseWriter, r *http
 	message := "your user account doesn't have the necessary permissions to access this resource"
 	app.errorResponse(w, r, http.StatusForbidden, message)
 }
+
+func (app *application) invoicesLimitResponse(w http.ResponseWriter, r *http.Request) {
+	message := "you have reached the maximum number of invoices allowed for your plan try upgrading to a higher plan"
+	app.errorResponse(w, r, http.StatusPaymentRequired, message)
+}

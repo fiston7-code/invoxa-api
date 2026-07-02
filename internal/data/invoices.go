@@ -325,3 +325,23 @@ func (m InvoiceModel) GetAll(businessID int, clientName string, status string, f
 	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
 	return invoices, metadata, nil
 }
+
+// Compter les invoices du mois courant
+func (m InvoiceModel) CountByUserThisMonth(userID int) (int, error) {
+	query := `
+		SELECT COUNT(*) FROM invoices
+		WHERE user_id = $1
+		AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+	`
+
+	var count int
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, userID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}

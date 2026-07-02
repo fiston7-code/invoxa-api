@@ -18,6 +18,16 @@ func (app *application) createInvoiceHandler(w http.ResponseWriter, r *http.Requ
 		app.authenticationRequiredResponse(w, r)
 		return
 	}
+	count, err := app.models.Invoices.CountByUserThisMonth(user.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	if count >= 30 {
+		app.invoicesLimitResponse(w, r)
+		return
+	}
 	// Structure complète pour correspondre à ton JSON
 	var input struct {
 		BusinessProfileID int       `json:"business_profile_id"`
