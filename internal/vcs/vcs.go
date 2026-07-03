@@ -1,17 +1,34 @@
 package vcs
 
 import (
-	_ "fmt"
+	"fmt"
 	"runtime/debug"
 )
 
 func Version() string {
-	// Use debug.ReadBuildInfo() to retrieve a debug.BuildInfo struct. If this is available,
-	// the ok value will be true, and we return the pseudo-version contained in the
-	// Main.Version field.
+	var (
+		time     string
+		revision string
+		modified bool
+	)
+
 	bi, ok := debug.ReadBuildInfo()
 	if ok {
-		return bi.Main.Version
+		for _, s := range bi.Settings {
+			switch s.Key {
+			case "vcs.time":
+				time = s.Value
+			case "vcs.revision":
+				revision = s.Value
+			case "vcs.modified":
+				if s.Value == "true" {
+					modified = true
+				}
+			}
+		}
 	}
-	return ""
+	if modified {
+		return fmt.Sprintf("%s-%s+dirty", time, revision)
+	}
+	return fmt.Sprintf("%s-%s", time, revision)
 }

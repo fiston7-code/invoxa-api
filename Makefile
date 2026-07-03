@@ -73,4 +73,34 @@ build/api:
 ## build/api-linux: build the cmd/api application for Linux (production)
 .PHONY: build/api-linux
 build/api-linux:
-	GOOS=linux GOARCH=amd64 go build -ldflags='-s' -o=./bin/linux_amd64/api ./cmd/api
+	GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o=./bin/linux_amd64/api ./cmd/api
+
+# ==================================================================================== #
+# PRODUCTION
+# ==================================================================================== #
+production_host_ip = '104.248.251.249'
+
+## production/connect: connect to the production server
+.PHONY: production/connect
+production/connect:
+	ssh fastvoxa@${production_host_ip}
+
+## production/deploy/api: deploy the api, migrations, and systemd service to production
+.PHONY: production/deploy/api
+production/deploy/api:
+	@echo 'Compiling application for Linux...'
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ./bin/linux_amd64/api ./cmd/api
+	@echo 'Transferring files to server...'
+	rsync -P ./bin/linux_amd64/api fastvoxa@${production_host_ip}:~
+	rsync -rP --delete ./migrations fastvoxa@${production_host_ip}:~
+	rsync -P ./remote/production/api.service fastvoxa@${production_host_ip}:~
+	rsync -P ./remote/production/Caddyfile fastvoxa@${production_host_ip}:~
+	@echo 'Executing remote deployment commands...'
+	ssh -t fastvoxa@${production_host_ip} '\
+		migrate -path ~/migrations -database $$FASTVOXA_DB_DSN up \
+		&& sudo mv ~/api.service /etc/systemd/system/fastvoxa.service \
+		&& sudo mv ~/Caddyfile /etc/caddy/Caddyfile \
+		&& sudo systemctl daemon-reload \
+		&& sudo systemctl restart fastvoxa \
+		&& sudo systemctl reload caddy \
+	'
