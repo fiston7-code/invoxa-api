@@ -12,7 +12,7 @@ User=fastvoxa
 Group=fastvoxa
 EnvironmentFile=/etc/environment
 WorkingDirectory=/home/fastvoxa
-ExecStart=/home/fastvoxa/api -port=4000 -db-dsn=${FASTVOXA_DB_DSN} -env=production
+ExecStart=/home/fastvoxa/api -port=4000 -db-dsn=${FASTVOXA_DB_DSN} -env=production -cors-trusted-origins="https://fastvoxa.com http://localhost:3000"
 Restart=on-failure
 RestartSec=5
 

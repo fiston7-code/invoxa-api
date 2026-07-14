@@ -328,11 +328,14 @@ func (m InvoiceModel) GetAll(businessID int, clientName string, status string, f
 
 // Compter les invoices du mois courant
 func (m InvoiceModel) CountByUserThisMonth(userID int) (int, error) {
+	// On fait une jointure pour passer par business_profiles
 	query := `
-		SELECT COUNT(*) FROM invoices
-		WHERE user_id = $1
-		AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
-	`
+        SELECT COUNT(i.id) 
+        FROM invoices i
+        JOIN business_profiles b ON i.business_id = b.id
+        WHERE b.user_id = $1
+        AND DATE_TRUNC('month', i.created_at) = DATE_TRUNC('month', NOW())
+    `
 
 	var count int
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

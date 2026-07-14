@@ -57,6 +57,10 @@ type config struct {
 	cors struct {
 		trustedOrigins []string
 	}
+
+	google struct {
+		clientID string
+	}
 }
 
 // Define an application struct to hold the dependencies for our HTTP handlers, helpers,
@@ -83,6 +87,7 @@ func main() {
 	// Use the value of the GREENLIGHT_DB_DSN environment variable as the default value
 	// for our db-dsn command-line flag.
 	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("INVOXA_DB_DSN"), "PostgreSQL DSN")
+	flag.StringVar(&cfg.google.clientID, "google-client-id", os.Getenv("GOOGLE_CLIENT_ID"), "Google OAuth Client ID")
 
 	// Read the connection pool settings from command-line flags into the config struct.
 	// Note that the default values we're using are the ones we discussed above.
